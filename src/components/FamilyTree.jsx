@@ -32,6 +32,16 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
   const [pan, setPan] = useState({ x: 0, y: 40 });
   const drag = useRef(null);
   const didCenter = useRef(false);
+  // Gates the CSS transition below — on while zooming (buttons/wheel) so the jump
+  // eases in smoothly, off while drag-panning so the tree tracks the cursor instantly.
+  const [isDragging, setIsDragging] = useState(false);
+  // Mirrors `zoom` for synchronous reads inside zoomAt/handleWheel/zoomBy, since those
+  // need the up-to-date value without waiting for a re-render (state setter callbacks
+  // firing back-to-back, e.g. rapid wheel events, would otherwise read a stale `zoom`).
+  const zoomRef = useRef(zoom);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
 
   // Centres the viewport on the focus person's node (falls back to tree centre).
   const centerTree = useCallback(() => {
@@ -48,10 +58,24 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
     }
   }, [layout, rootId]);
 
-  // Re-centre whenever the focus person changes (e.g. after "Set as Root").
+  // Re-centre whenever the focus person changes (e.g. after "Set as Root"), and reset
+  // zoom back to 1 at the same time. Without the zoom reset, a level carried over
+  // from whatever was previously on screen (a different person's Pedigree View, or a
+  // zoomed-out Full Tree View) breaks the auto-centring math for the new layout:
+  // centerTree()'s pan formula assumes zoom 1, so at any other zoom the computed pan
+  // lands the content off-screen — it looks blank until "reset view" is clicked
+  // (which resets zoom AND pan together, masking the bug). Also reset on a pure mode
+  // switch (forest <-> pedigree) even when rootId happens to stay the same, since the
+  // two layouts are entirely different shapes.
   useEffect(() => {
     didCenter.current = false;
+    setZoom(1);
   }, [rootId]);
+
+  useEffect(() => {
+    didCenter.current = false;
+    setZoom(1);
+  }, [mode]);
 
   useEffect(() => {
     if (!didCenter.current && layout.width) {
@@ -60,23 +84,36 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
     }
   }, [layout.width, centerTree]);
 
+  // Changes zoom while keeping the world point under (anchorX, anchorY) — a
+  // viewport-relative pixel coordinate — visually fixed in place. `.tree-world`'s
+  // transform-origin is 0 0, so scaling always pivots on the far corner of the
+  // whole tree; without this pan correction any zoom change (buttons or wheel)
+  // would visibly yank the content toward/away from that corner instead of the
+  // point the user is actually looking at, which is what made zoom feel "random".
+  const zoomAt = useCallback((anchorX, anchorY, nextZoom) => {
+    // Captured now, not read inside the setPan updater below — that callback runs
+    // later during React's commit, by which point a same-tick zoomRef mutation
+    // would already read as `nextZoom`, collapsing the ratio to 1 and silently
+    // disabling the anchor correction (the bug that made zoom drift off-centre).
+    const prevZoom = zoomRef.current;
+    setPan((p) => ({
+      x: anchorX - (anchorX - p.x) * (nextZoom / prevZoom),
+      y: anchorY - (anchorY - p.y) * (nextZoom / prevZoom),
+    }));
+    zoomRef.current = nextZoom;
+    setZoom(nextZoom);
+  }, []);
+
   const handleWheel = useCallback(
     (e) => {
       e.preventDefault();
       const el = containerRef.current;
-      const rect = el.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      setZoom((z) => {
-        const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z - e.deltaY * 0.0015));
-        setPan((p) => ({
-          x: cx - (cx - p.x) * (next / z),
-          y: cy - (cy - p.y) * (next / z),
-        }));
-        return next;
-      });
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomRef.current - e.deltaY * 0.0015));
+      // Anchor on the viewport centre (not the cursor) so wheel zoom matches the
+      // +/- buttons and always zooms toward what's currently in the middle of the screen.
+      zoomAt(el.clientWidth / 2, el.clientHeight / 2, next);
     },
-    []
+    [zoomAt]
   );
 
   const onMouseDown = (e) => {
@@ -84,6 +121,7 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
     // Don't hijack clicks on cards/toggle buttons — only pan when starting on empty canvas.
     if (e.target.closest('button')) return;
     drag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
+    setIsDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onMouseMove = (e) => {
@@ -95,16 +133,33 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
   };
   const endDrag = (e) => {
     drag.current = null;
+    setIsDragging(false);
     if (e?.currentTarget?.releasePointerCapture && e.pointerId != null) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
   };
 
-  const zoomBy = (delta) =>
-    setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z + delta)));
+  // Anchored on the viewport centre so the +/- buttons zoom toward/away from whatever
+  // is currently in the middle of the screen, matching what the wheel zoom does at
+  // the cursor — instead of leaving pan untouched, which pivots around the tree's
+  // top-left corner (transform-origin 0 0) and feels like the view jumps randomly.
+  const zoomBy = useCallback(
+    (delta) => {
+      const el = containerRef.current;
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomRef.current + delta));
+      if (!el) {
+        zoomRef.current = next;
+        setZoom(next);
+        return;
+      }
+      zoomAt(el.clientWidth / 2, el.clientHeight / 2, next);
+    },
+    [zoomAt]
+  );
 
   const resetView = () => {
     setZoom(1);
+    zoomRef.current = 1;
     centerTree();
   };
 
@@ -121,7 +176,10 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
       >
         <div
           className="tree-world"
-          style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
         >
           <ConnectorLines links={layout.links} width={layout.width} height={layout.height} />
           {layout.nodes.map((node) => (
