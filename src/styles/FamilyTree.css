@@ -1,0 +1,339 @@
+.tree-viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.tree-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+  background:
+    radial-gradient(circle, var(--color-border) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.tree-canvas:active {
+  cursor: grabbing;
+}
+
+.tree-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* Node container */
+.tree-node {
+  position: absolute;
+}
+
+.couple {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.couple-link {
+  margin-top: 34px;
+  height: 3px;
+  background: var(--color-female);
+  opacity: 0.5;
+  border-radius: 2px;
+}
+
+/* Mini card: circular avatar with a gender-coloured ring + name below */
+.mini-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 6px 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font);
+  text-align: center;
+}
+
+.mini-card:hover .avatar {
+  transform: translateY(-2px) scale(1.08);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18), 0 0 0 3px var(--color-primary);
+}
+
+.mini-card-deceased .avatar {
+  opacity: 0.6;
+  filter: grayscale(35%);
+}
+
+.mini-card-focus .avatar {
+  box-shadow: 0 0 0 4px var(--color-focus, #f5b301), 0 0 16px 2px rgba(245, 179, 1, 0.6);
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  overflow: hidden;
+  border: 3px solid;
+  transition: box-shadow 0.15s, transform 0.15s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-male { background: var(--color-male); border-color: var(--color-male-ring, #2c8ea3); }
+.avatar-female { background: var(--color-female); border-color: var(--color-female-ring, #e08b2f); }
+.avatar-other { background: var(--color-other); border-color: var(--color-other); }
+
+.mini-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.2;
+  max-width: 100px;
+}
+
+.dagger {
+  color: var(--color-deceased-border);
+  margin-right: 3px;
+}
+
+/* Wrapper around each MiniCard — hosts the hover/select-triggered quick-add "+" and its menu */
+.mini-card-wrap {
+  position: relative;
+}
+
+/* Same father/mother pair, but rendered AS the node itself (a shared placeholder
+   parent with no data yet — see TreeNode's isPlaceholder branch) instead of
+   overlaid above a real card, so there's no separate "Unknown Parent" avatar. */
+.parent-only-node {
+  align-items: flex-start;
+  padding-top: 6px;
+}
+
+.parent-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 68px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted, #8a8f98);
+  font-family: var(--font);
+  cursor: pointer;
+}
+
+.parent-placeholder:hover .parent-placeholder-box {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.parent-placeholder:hover .parent-placeholder-label {
+  color: var(--color-primary);
+}
+
+.parent-placeholder-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px dashed var(--color-connector);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.parent-placeholder-label {
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 0.12s;
+}
+
+.parent-placeholder-bar {
+  width: 16px;
+  height: 0;
+  margin-top: 28px;
+  border-top: 2px dashed var(--color-connector);
+  flex-shrink: 0;
+}
+
+/* Anchored to the bottom edge of the 56px avatar circle (6px card padding + 56px avatar). */
+.mini-card-add-anchor {
+  position: absolute;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+}
+
+.mini-card-add {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.12s, transform 0.12s;
+}
+
+.mini-card-wrap:hover .mini-card-add,
+.mini-card-wrap-focus .mini-card-add,
+.mini-card-wrap-menu-open .mini-card-add {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Badge on anyone married in from another family, whose own parents/siblings render
+   as a separate small tree elsewhere — click to jump there instead of hunting for
+   the dashed line across the canvas. Sits on the avatar ring's top-right edge (~45°),
+   half overlapping it — the same "attached to the ring" treatment the bottom "+"
+   quick-add button already uses, so it reads as one consistent badge language rather
+   than a floating extra. Filled with the primary accent colour (rather than a neutral
+   outline) so it reads as a distinct, noticeable affordance rather than a subtle
+   detail — this is the one badge in the app that opens a whole different view.
+   Geometry: avatar is 56px, 6px from the card top, centered in the 132px-wide card
+   (NODE_W/AVATAR_SIZE/AVATAR_TOP in useTreeLayout.js) — centre (66, 34), radius 28;
+   a 22px badge centred on the ring's 45° point lands ~(75, 3).
+*/
+.mini-card-jump {
+  position: absolute;
+  top: 3px;
+  left: 75px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--color-surface);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  z-index: 3;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+
+.mini-card-jump:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 2px var(--color-primary), var(--shadow);
+}
+
+.mini-card-add:hover {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.mini-card-menu {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  min-width: 130px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  z-index: 4;
+}
+
+.mini-card-menu button {
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font);
+  font-size: 12px;
+  text-align: left;
+  padding: 8px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mini-card-menu button:hover {
+  background: var(--color-bg);
+  color: var(--color-primary);
+}
+
+.toggle-btn {
+  position: absolute;
+  bottom: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  z-index: 2;
+}
+
+.toggle-btn:hover {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+/* Floating zoom controls */
+.tree-controls {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tree-controls button {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+.tree-controls button:hover {
+  background: var(--color-bg);
+}
