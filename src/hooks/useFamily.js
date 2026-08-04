@@ -223,6 +223,68 @@ export function useFamily() {
     return newId;
   }, []);
 
+  // Wires up a relationship between two ALREADY-EXISTING people (no new person
+  // created), mirroring addParent/addSpouse/addChild/addSibling's edge-setting —
+  // used by PersonForm's "Link Existing" tab. Eligibility (no cycles, no
+  // duplicate roles) is enforced upstream by familyUtils' getEligibleLinkCandidates.
+  const linkExisting = useCallback((personId, relation, existingId) => {
+    setPersons((prev) => {
+      const person = prev[personId];
+      const other = prev[existingId];
+      if (!person || !other) return prev;
+      let next = prev;
+
+      if (relation === 'spouse') {
+        next = {
+          ...next,
+          [personId]: { ...person, spouseId: existingId },
+          [existingId]: { ...other, spouseId: personId },
+        };
+      } else if (relation === 'parent') {
+        next = {
+          ...next,
+          [personId]: { ...person, parentIds: [...person.parentIds, existingId] },
+          [existingId]: { ...other, childrenIds: [...other.childrenIds, personId] },
+        };
+        const existingParentId = person.parentIds[0];
+        if (existingParentId && next[existingParentId] && !next[existingParentId].spouseId && !next[existingId].spouseId) {
+          next[existingParentId] = { ...next[existingParentId], spouseId: existingId };
+          next[existingId] = { ...next[existingId], spouseId: existingParentId };
+        }
+      } else if (relation === 'child') {
+        const parentPair = [personId];
+        if (person.spouseId && next[person.spouseId]) parentPair.push(person.spouseId);
+        next = {
+          ...next,
+          [existingId]: { ...other, parentIds: [...new Set([...other.parentIds, ...parentPair])] },
+        };
+        for (const pid of parentPair) {
+          next[pid] = { ...next[pid], childrenIds: [...next[pid].childrenIds, existingId] };
+        }
+      } else if (relation === 'sibling') {
+        let parentIds = person.parentIds;
+        if (parentIds.length === 0) {
+          const placeholderId = generateId(next);
+          const placeholder = {
+            ...createEmptyPerson(placeholderId),
+            firstName: 'Unknown',
+            lastName: person.lastName,
+            isPlaceholder: true,
+            childrenIds: [personId],
+          };
+          next = { ...next, [placeholderId]: placeholder, [personId]: { ...person, parentIds: [placeholderId] } };
+          parentIds = [placeholderId];
+        }
+        next = { ...next, [existingId]: { ...next[existingId], parentIds: [...parentIds] } };
+        for (const pid of parentIds) {
+          next[pid] = { ...next[pid], childrenIds: [existingId, ...next[pid].childrenIds] };
+        }
+      }
+
+      return next;
+    });
+  }, []);
+
   // Clears a mutual spouse link (both sides), including any recorded marriage date.
   // Neither person is deleted — just the relationship between them.
   const removeSpouse = useCallback((personId) => {
@@ -300,6 +362,7 @@ export function useFamily() {
     addSpouse,
     addParent,
     addSibling,
+    linkExisting,
     removeSpouse,
     removeParent,
     removeChild,

@@ -54,6 +54,67 @@ function isMarriedIn(persons, person) {
   return !!spouse && spouse.parentIds.length > 0;
 }
 
+function collectAncestorIds(persons, id, visited = new Set()) {
+  const person = getPerson(persons, id);
+  if (!person) return visited;
+  for (const parentId of person.parentIds) {
+    if (visited.has(parentId)) continue;
+    visited.add(parentId);
+    collectAncestorIds(persons, parentId, visited);
+  }
+  return visited;
+}
+
+function collectDescendantIds(persons, id, visited = new Set()) {
+  const person = getPerson(persons, id);
+  if (!person) return visited;
+  for (const childId of person.childrenIds) {
+    if (visited.has(childId)) continue;
+    visited.add(childId);
+    collectDescendantIds(persons, childId, visited);
+  }
+  return visited;
+}
+
+// Which already-recorded people are safe to attach as `relation`
+// ('parent'|'spouse'|'child'|'sibling') of personId instead of creating a new
+// person — used by PersonForm's "Link Existing" tab. Excludes personId's own
+// ancestors/descendants (would create a cycle), placeholders (fill those in
+// directly instead), and anyone already in that exact role.
+export function getEligibleLinkCandidates(persons, personId, relation) {
+  const person = getPerson(persons, personId);
+  if (!person) return [];
+
+  const ancestorIds = collectAncestorIds(persons, personId);
+  const descendantIds = collectDescendantIds(persons, personId);
+
+  return Object.values(persons).filter((candidate) => {
+    if (candidate.id === personId || candidate.isPlaceholder) return false;
+
+    switch (relation) {
+      case 'spouse':
+        return !candidate.spouseId && !ancestorIds.has(candidate.id) && !descendantIds.has(candidate.id);
+      case 'parent':
+        return (
+          !person.parentIds.includes(candidate.id) &&
+          candidate.id !== person.spouseId &&
+          !descendantIds.has(candidate.id)
+        );
+      case 'child':
+        return (
+          !person.childrenIds.includes(candidate.id) &&
+          candidate.id !== person.spouseId &&
+          candidate.parentIds.length < 2 &&
+          !ancestorIds.has(candidate.id)
+        );
+      case 'sibling':
+        return candidate.parentIds.length === 0 && candidate.id !== person.spouseId;
+      default:
+        return false;
+    }
+  });
+}
+
 // Counts a person's full blood-descendant closure (via childrenIds only), used to
 // rank family clusters so the larger lineage claims any shared descendants first
 // when two families are linked by a marriage deep inside both trees.

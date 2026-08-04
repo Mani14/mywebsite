@@ -10,6 +10,9 @@ import ThemeToggle from './components/ThemeToggle';
 import { getPerson, getFullName } from './utils/familyUtils';
 import './styles/App.css';
 
+// Maps a formState.mode to the `relation` PersonForm/getEligibleLinkCandidates use.
+const RELATION_BY_MODE = { addParent: 'parent', addSpouse: 'spouse', addChild: 'child', addSibling: 'sibling' };
+
 export default function App() {
   const {
     persons,
@@ -23,6 +26,7 @@ export default function App() {
     addSpouse,
     addParent,
     addSibling,
+    linkExisting,
     removeSpouse,
     removeParent,
     removeChild,
@@ -119,6 +123,17 @@ export default function App() {
   const handleQuickAdd = useCallback((personId, mode, parentGender) => {
     setFormState({ mode, personId, parentGender });
   }, []);
+
+  // "Link Existing" tab: attaches an already-recorded person in the requested role
+  // instead of creating a duplicate, then opens their details like a normal add would.
+  const handleLinkExisting = useCallback((existingId) => {
+    if (!formState) return;
+    const relation = RELATION_BY_MODE[formState.mode];
+    if (!relation) return;
+    linkExisting(formState.personId, relation, existingId);
+    handleSelect(existingId);
+    closeForm();
+  }, [formState, linkExisting, handleSelect, closeForm]);
 
   const handleAddFirstPerson = useCallback(() => {
     setFormState({ mode: 'addFirst', personId: null });
@@ -296,6 +311,10 @@ export default function App() {
           title="Add Child"
           initialPerson={{}}
           showMarriageDate={false}
+          persons={persons}
+          personId={formState.personId}
+          relation="child"
+          onLinkExisting={handleLinkExisting}
           onSave={handleFormSave}
           onCancel={closeForm}
         />
@@ -305,6 +324,10 @@ export default function App() {
           title="Add Spouse"
           initialPerson={{}}
           showMarriageDate
+          persons={persons}
+          personId={formState.personId}
+          relation="spouse"
+          onLinkExisting={handleLinkExisting}
           onSave={handleFormSave}
           onCancel={closeForm}
         />
@@ -314,6 +337,10 @@ export default function App() {
           title={formState.parentGender === 'father' ? 'Add Father' : formState.parentGender === 'mother' ? 'Add Mother' : 'Add Parent'}
           initialPerson={formState.parentGender ? { gender: formState.parentGender === 'father' ? 'male' : 'female' } : {}}
           showMarriageDate={false}
+          persons={persons}
+          personId={formState.personId}
+          relation="parent"
+          onLinkExisting={handleLinkExisting}
           onSave={handleFormSave}
           onCancel={closeForm}
         />
@@ -332,6 +359,10 @@ export default function App() {
           title="Add Sibling"
           initialPerson={{}}
           showMarriageDate={false}
+          persons={persons}
+          personId={formState.personId}
+          relation="sibling"
+          onLinkExisting={handleLinkExisting}
           onSave={handleFormSave}
           onCancel={closeForm}
         />
