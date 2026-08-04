@@ -73,7 +73,7 @@ export default function PersonForm({
         {canLinkExisting && (
           <div className="person-form-tabs">
             <button type="button" className={tab === 'new' ? 'active' : ''} onClick={() => setTab('new')}>
-              New Person
+              Create New
             </button>
             <button type="button" className={tab === 'link' ? 'active' : ''} onClick={() => setTab('link')}>
               Link Existing
