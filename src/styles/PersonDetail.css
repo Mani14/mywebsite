@@ -247,5 +247,6 @@
     border-left: none;
     border-top: 1px solid var(--glass-border);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
   }
 }

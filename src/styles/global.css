@@ -121,6 +121,9 @@ body,
 #root {
   margin: 0;
   height: 100%;
+  /* Any stray overflow (e.g. a header row that doesn't quite fit) must never cause
+     the whole page to scroll sideways on a phone — that's what made mobile feel broken. */
+  overflow-x: hidden;
 }
 
 body {
@@ -129,7 +132,16 @@ body {
   background: var(--color-bg-gradient);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  /* Removes the ~300ms tap delay and double-tap-to-zoom on touch devices while still
+     allowing pinch-zoom, so buttons/cards feel instantly responsive on mobile. */
+  touch-action: manipulation;
   transition: background var(--duration-base) var(--ease), color var(--duration-base) var(--ease);
+}
+
+button,
+[role='button'] {
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Visible keyboard-focus ring on every interactive element, app-wide */

@@ -171,3 +171,33 @@
   color: #fff;
   cursor: pointer;
 }
+
+@media (max-width: 480px) {
+  /* Side-by-side fields (e.g. first/last name, birth/death date) get too narrow to
+     use comfortably on a phone-width modal, so stack them into one column instead. */
+  .person-form-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .person-form-checkbox {
+    margin-top: 4px;
+  }
+
+  .person-form-tabs {
+    gap: 6px;
+  }
+
+  .person-form-tabs button {
+    padding: 8px 6px;
+    font-size: 13px;
+  }
+
+  .person-form-actions {
+    justify-content: stretch;
+  }
+
+  .person-form-actions button {
+    flex: 1;
+  }
+}

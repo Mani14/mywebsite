@@ -9,6 +9,10 @@
   inset: 0;
   overflow: hidden;
   cursor: grab;
+  /* Hands single-finger drag/pan entirely to our pointer-event handlers instead of
+     letting the browser try to scroll/refresh the page — without this, panning the
+     tree on a phone felt laggy or triggered pull-to-refresh instead of moving the canvas. */
+  touch-action: none;
   background:
     radial-gradient(circle, var(--color-border) 1px, transparent 1px);
   background-size: 24px 24px;
@@ -451,4 +455,17 @@
   color: #fff;
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
+}
+
+@media (max-width: 480px) {
+  .tree-controls {
+    right: 10px;
+    bottom: 10px;
+    gap: 4px;
+  }
+
+  .tree-controls button {
+    width: 40px;
+    height: 40px;
+  }
 }

@@ -72,3 +72,9 @@
 .stats-panel-count {
   color: var(--color-text-muted);
 }
+
+@media (max-width: 480px) {
+  .stats-panel-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

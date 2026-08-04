@@ -214,13 +214,62 @@
   .app-header {
     padding: var(--space-2) var(--space-3);
     gap: var(--space-2);
+    align-items: center;
   }
 
   .app-header h1 {
     font-size: var(--font-lg);
+    flex: 1 1 auto;
   }
 
   .app-save-indicator span {
     display: none;
+  }
+
+  /* The search box no longer fights the title for space on its own line — it gets
+     a full-width row of its own, right under the title. */
+  .app-header .search-bar {
+    order: 3;
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  /* All the icon-button groups become one horizontally-scrollable strip on their
+     own row instead of wrapping mid-group into a ragged, overflowing mess. */
+  .app-header-actions {
+    order: 4;
+    flex: 1 1 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .app-header-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-header-actions > * {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .pedigree-breadcrumb {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .pedigree-breadcrumb-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-attach-banner {
+    flex-wrap: wrap;
+    row-gap: 6px;
   }
 }
