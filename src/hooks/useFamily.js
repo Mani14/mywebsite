@@ -213,8 +213,10 @@ export function useFamily() {
         parentIds: [...parentIds],
       };
       next = { ...next, [newId]: sibling };
+      // Prepended, not appended — left is the father/blood-lineage side of the
+      // tree, and a new sibling should land there rather than off to the right.
       for (const pid of parentIds) {
-        if (next[pid]) next[pid] = { ...next[pid], childrenIds: [...next[pid].childrenIds, newId] };
+        if (next[pid]) next[pid] = { ...next[pid], childrenIds: [newId, ...next[pid].childrenIds] };
       }
       return next;
     });
