@@ -44,11 +44,16 @@ export default function App() {
     });
   }, []);
 
-  // Selecting a person also shifts the highlighted focus + re-centres the view on them.
+  // Selecting a person opens their detail panel, and in Forest View also shifts the
+  // highlighted focus + re-centres the view on them — harmless there, since the
+  // forest's layout doesn't depend on who's focused. In Pedigree View the focus IS
+  // the diagram's root, so changing it on every click would re-root (and reshuffle)
+  // the whole tree just from opening someone's details; only explicit navigation
+  // (search, jump-to-family, Set as Root) should do that there.
   const handleSelect = useCallback((id) => {
     setSelectedId(id);
-    setFocusId(id);
-  }, []);
+    if (viewMode === 'forest') setFocusId(id);
+  }, [viewMode]);
 
   // "Jump to their family" (the 🔗 badge on anyone married in who has their own
   // recorded parents) opens a dedicated Pedigree View centred on THAT person,
@@ -152,10 +157,13 @@ export default function App() {
     });
   }, [persons]);
 
+  // Search is explicit navigation intent regardless of view mode, unlike a plain
+  // canvas click (handleSelect), so it always moves the focus/pedigree root.
   const handleSearchSelect = useCallback((id) => {
     revealAncestors(id);
-    handleSelect(id);
-  }, [revealAncestors, handleSelect]);
+    setSelectedId(id);
+    setFocusId(id);
+  }, [revealAncestors]);
 
   // Import replaces the whole dataset, then re-syncs any open selection/focus.
   const handleImport = useCallback((data) => {
