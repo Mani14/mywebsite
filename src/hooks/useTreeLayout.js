@@ -5,6 +5,7 @@ import {
   computeChildOrderOverrides,
   countDescendants,
   primaryLineageRoot,
+  getLineageRootIds,
 } from '../utils/familyUtils';
 
 // Card + spacing geometry (in world pixels).
@@ -312,8 +313,10 @@ export function computeForestLayout(persons, rootIds, collapsed = new Set(), { e
     batch.yShift = childNode.y - (NODE_H + V_GAP) - rootNode.y;
   });
 
-  batches.forEach(({ tree, xOffset: xo, yShift = 0 }) => {
-    tree.nodes.forEach((n) => out.nodes.push({ ...n, x: n.x + xo, y: n.y + yShift }));
+  batches.forEach(({ rootId, tree, xOffset: xo, yShift = 0 }) => {
+    // Tags each node with which root's tree it was drawn from — lets the
+    // dad-side/mom-side highlighting tell fatherRoot's tree apart from motherRoot's.
+    tree.nodes.forEach((n) => out.nodes.push({ ...n, x: n.x + xo, y: n.y + yShift, treeRootId: rootId }));
     tree.links.forEach((l) =>
       out.links.push({ ...l, fromX: l.fromX + xo, toX: l.toX + xo, fromY: l.fromY + yShift, toY: l.toY + yShift })
     );
@@ -382,11 +385,7 @@ export function computePedigreeLayout(persons, personId, collapsed = new Set()) 
   const person = persons[personId];
   if (!person) return { nodes: [], links: [], crossLinks: [], maxDepth: 0, width: 0, height: 0 };
 
-  // Data convention: parentIds[0] is the blood/father side, parentIds[1] the
-  // married-in/mother side (see primaryLineageRoot).
-  const [fatherId, motherId] = person.parentIds;
-  const fatherRoot = fatherId && persons[fatherId] ? primaryLineageRoot(persons, fatherId) : null;
-  const motherRoot = motherId && persons[motherId] ? primaryLineageRoot(persons, motherId) : null;
+  const { fatherRootId: fatherRoot, motherRootId: motherRoot } = getLineageRootIds(persons, personId);
 
   let rootIds;
   if (fatherRoot && motherRoot && fatherRoot !== motherRoot) {

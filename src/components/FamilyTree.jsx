@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useForestLayout, usePedigreeLayout } from '../hooks/useTreeLayout';
-import { getForestRoots } from '../utils/familyUtils';
+import { getForestRoots, getLineageRootIds } from '../utils/familyUtils';
 import ConnectorLines from './ConnectorLines';
 import TreeNode from './TreeNode';
 import '../styles/FamilyTree.css';
@@ -35,6 +35,21 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
     () => new Set(layout.nodes.flatMap((n) => (n.spouse ? [n.id, n.spouse.id] : [n.id]))),
     [layout]
   );
+
+  // Dad-side/mom-side highlighting: whichever two lineage trees are the current
+  // focus person's father's and mother's, tinted so their halves of the diagram
+  // (or, in Full Tree View, just their two trees among everyone else's) stand out.
+  const { fatherRootId, motherRootId } = useMemo(() => getLineageRootIds(persons, rootId), [persons, rootId]);
+  const sideOf = useCallback(
+    (node) => {
+      if (!node.treeRootId) return null;
+      if (node.treeRootId === fatherRootId) return 'father';
+      if (node.treeRootId === motherRootId) return 'mother';
+      return null;
+    },
+    [fatherRootId, motherRootId]
+  );
+
   const containerRef = useRef(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 40 });
@@ -196,6 +211,7 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
               node={node}
               focusId={rootId}
               renderedIds={renderedIds}
+              side={sideOf(node)}
               onSelect={onSelect}
               onToggle={onToggle}
               onQuickAdd={onQuickAdd}

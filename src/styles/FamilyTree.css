@@ -35,6 +35,19 @@
   display: flex;
   align-items: stretch;
   justify-content: center;
+  border-radius: var(--radius);
+}
+
+/* Dad-side/mom-side highlight: tints every couple drawn from the current focus
+   person's father-lineage or mother-lineage tree (see FamilyTree's sideOf/treeRootId). */
+.couple-side-father {
+  background: var(--color-father-tint);
+  box-shadow: inset 0 0 0 1px var(--color-father-tint-border);
+}
+
+.couple-side-mother {
+  background: var(--color-mother-tint);
+  box-shadow: inset 0 0 0 1px var(--color-mother-tint-border);
 }
 
 .couple-link {

@@ -86,6 +86,19 @@ export function primaryLineageRoot(persons, id) {
   return current.id;
 }
 
+// Resolves a person's father-side and mother-side lineage roots (their whole
+// blood families' respective tops), per the parentIds[0]=father/[1]=mother
+// convention — used both by computePedigreeLayout (which two trees to render)
+// and by the dad-side/mom-side highlight coloring (which tree a node came from).
+export function getLineageRootIds(persons, personId) {
+  const person = getPerson(persons, personId);
+  if (!person) return { fatherRootId: null, motherRootId: null };
+  const [fatherId, motherId] = person.parentIds;
+  const fatherRootId = fatherId && persons[fatherId] ? primaryLineageRoot(persons, fatherId) : null;
+  const motherRootId = motherId && persons[motherId] ? primaryLineageRoot(persons, motherId) : null;
+  return { fatherRootId, motherRootId };
+}
+
 // Finds every distinct top-of-lineage person/couple (no recorded parents, and not
 // merely married into someone else's blood line) so each gets its own tree in the
 // rendered forest. Two families can still be linked deep inside by a marriage (e.g.

@@ -107,9 +107,10 @@ function MiniCard({ person, isFocus, hasSpouse, showJumpLink, onSelect, onQuickA
 }
 
 // A positioned node holding a person (and optional spouse) plus an expand toggle.
-export default function TreeNode({ node, focusId, renderedIds, onSelect, onToggle, onQuickAdd, onJumpTo }) {
+export default function TreeNode({ node, focusId, renderedIds, side, onSelect, onToggle, onQuickAdd, onJumpTo }) {
   const { person, spouse, x, y, coupleWidth } = node;
   const left = x - coupleWidth / 2;
+  const sideClass = side ? ` couple-side-${side}` : '';
 
   // A shared placeholder parent auto-created by "Add Sibling" (see useFamily's
   // addSibling) is never drawn as its own card — instead its row shows the same
@@ -149,7 +150,7 @@ export default function TreeNode({ node, focusId, renderedIds, onSelect, onToggl
 
   return (
     <div className="tree-node" style={{ left, top: y, width: coupleWidth }}>
-      <div className="couple">
+      <div className={`couple${sideClass}`}>
         <MiniCard
           person={person}
           isFocus={person.id === focusId}
