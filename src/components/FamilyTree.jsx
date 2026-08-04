@@ -27,6 +27,14 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
   const forestLayout = useForestLayout(persons, rootIds, collapsed);
   const pedigreeLayout = usePedigreeLayout(persons, rootId, collapsed);
   const layout = mode === 'pedigree' ? pedigreeLayout : forestLayout;
+
+  // Every person/spouse id actually drawn on THIS canvas right now — used to
+  // suppress a spouse's jump-link badge when their own parent (what the jump
+  // would take you to) is already visible here, making the jump redundant.
+  const renderedIds = useMemo(
+    () => new Set(layout.nodes.flatMap((n) => (n.spouse ? [n.id, n.spouse.id] : [n.id]))),
+    [layout]
+  );
   const containerRef = useRef(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 40 });
@@ -187,6 +195,7 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
               key={node.id}
               node={node}
               focusId={rootId}
+              renderedIds={renderedIds}
               onSelect={onSelect}
               onToggle={onToggle}
               onQuickAdd={onQuickAdd}

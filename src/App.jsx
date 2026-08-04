@@ -52,11 +52,10 @@ export default function App() {
 
   // "Jump to their family" (the 🔗 badge on anyone married in who has their own
   // recorded parents) opens a dedicated Pedigree View centred on THAT person,
-  // showing their own father's-side + mother's-side lineages — regardless of
-  // whether their family happens to be rendered elsewhere on the current canvas
-  // (Full Tree View) or isn't part of the current view at all (Pedigree View only
-  // ever shows the focus person's own two lineages, e.g. Susila's, never her
-  // daughter's husband's).
+  // showing their own father's-side + mother's-side lineages. TreeNode only shows
+  // the badge when that parent ISN'T already drawn on the current canvas (see
+  // FamilyTree.jsx's renderedIds) — e.g. it's suppressed once the parent (or
+  // placeholder parent) is already visible one row up in the same view.
   const handleJumpToFamily = useCallback((id) => {
     setViewMode('pedigree');
     setSelectedId(id);

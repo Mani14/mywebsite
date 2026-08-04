@@ -107,7 +107,7 @@ function MiniCard({ person, isFocus, hasSpouse, showJumpLink, onSelect, onQuickA
 }
 
 // A positioned node holding a person (and optional spouse) plus an expand toggle.
-export default function TreeNode({ node, focusId, onSelect, onToggle, onQuickAdd, onJumpTo }) {
+export default function TreeNode({ node, focusId, renderedIds, onSelect, onToggle, onQuickAdd, onJumpTo }) {
   const { person, spouse, x, y, coupleWidth } = node;
   const left = x - coupleWidth / 2;
 
@@ -175,11 +175,11 @@ export default function TreeNode({ node, focusId, onSelect, onToggle, onQuickAdd
             isFocus={spouse.id === focusId}
             hasSpouse
             // Anyone married in who has their own recorded parents has a family
-            // tree of their own somewhere — always offer a jump link to it,
-            // regardless of whether that family happens to be rendered on this
-            // same canvas (Full Tree View) or is entirely out of view (Pedigree
-            // View only ever shows the focus person's own two lineages).
-            showJumpLink={spouse.parentIds.length > 0}
+            // tree of their own somewhere — offer a jump link to it UNLESS that
+            // parent (what the jump would take you to) is already drawn right
+            // here on this same canvas, which would make the jump redundant
+            // (e.g. their placeholder parent is already shown one row up).
+            showJumpLink={spouse.parentIds.some((pid) => !renderedIds?.has(pid))}
             onSelect={onSelect}
             onQuickAdd={onQuickAdd}
             onJumpTo={onJumpTo}

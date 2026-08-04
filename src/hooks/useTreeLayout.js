@@ -265,21 +265,74 @@ export function computeForestLayout(persons, rootIds, collapsed = new Set(), { e
   // Pass 2: lay out each main tree for real, in visual (bridge-adjacent) order. Each
   // root only treats ids owned by OTHER roots as "already placed" — its own claimed
   // ids (even though the dry run touched them too) are drawn normally here.
+  //
+  // Every root's OWN tree independently starts at depth 0 (y = 0) — fine for
+  // genuinely separate families, but wrong for a lone auto-created placeholder
+  // parent (see useFamily.js's addSibling) whose only child got claimed by a
+  // DIFFERENT, earlier-processed root (e.g. that child's own spouse's tree). Such
+  // a placeholder is collected into `batches` first (instead of going straight
+  // onto the canvas) so it can be re-anchored one generation above its real
+  // child's final position before anything is drawn — see below.
   let xOffset = 0;
+  const batches = [];
   orderedRoots.forEach((rootId) => {
     const otherClaims = new Set(
       [...claimedBy.entries()].filter(([, owner]) => owner !== rootId).map(([claimedId]) => claimedId)
     );
     const tree = computeTreeLayout(persons, rootId, collapsed, otherClaims, childOrderOverrides.get(rootId) ?? null);
     if (!tree.nodes.length) return;
-    tree.nodes.forEach((n) => out.nodes.push({ ...n, x: n.x + xOffset }));
-    tree.links.forEach((l) => out.links.push({ ...l, fromX: l.fromX + xOffset, toX: l.toX + xOffset }));
+    batches.push({ rootId, tree, xOffset });
     pendingCrossLinks.push(...tree.crossLinks);
     out.maxDepth = Math.max(out.maxDepth, tree.maxDepth);
-    out.height = Math.max(out.height, tree.height);
     xOffset += tree.width + TREE_GAP;
   });
   out.width = Math.max(0, xOffset - TREE_GAP);
+
+  // A root that's an auto-created placeholder parent normally belongs one
+  // generation ABOVE its real children — but if one of its children was claimed
+  // by a different (earlier-processed) root, e.g. because that child already has
+  // their own spouse/root elsewhere, the placeholder's own batch has no fixed
+  // relationship to THAT root and, left alone, starts at row 0 like every other
+  // independent root instead of one row above where the child actually ended up.
+  // Detect that cross-linked case here and shift the placeholder's whole batch
+  // (itself plus any of its own unclaimed children, e.g. a sibling added at the
+  // same time) so it sits exactly one generation above the claimed child —
+  // dragging its own unclaimed children along keeps them correctly one row below
+  // the placeholder, and thus alongside their claimed sibling, same as before.
+  batches.forEach((batch) => {
+    const rootNode = batch.tree.nodes.find((n) => n.id === batch.rootId);
+    if (!rootNode || !rootNode.person?.isPlaceholder) return;
+    const link = batch.tree.crossLinks.find((l) => l.parentId === rootNode.id);
+    if (!link) return;
+    const childBatch = batches.find(
+      (b) => b !== batch && b.tree.nodes.some((n) => n.id === link.childId || n.spouse?.id === link.childId)
+    );
+    if (!childBatch) return;
+    const childNode = childBatch.tree.nodes.find((n) => n.id === link.childId || n.spouse?.id === link.childId);
+    batch.yShift = childNode.y - (NODE_H + V_GAP) - rootNode.y;
+  });
+
+  batches.forEach(({ tree, xOffset: xo, yShift = 0 }) => {
+    tree.nodes.forEach((n) => out.nodes.push({ ...n, x: n.x + xo, y: n.y + yShift }));
+    tree.links.forEach((l) =>
+      out.links.push({ ...l, fromX: l.fromX + xo, toX: l.toX + xo, fromY: l.fromY + yShift, toY: l.toY + yShift })
+    );
+  });
+
+  // A re-anchored placeholder can land above row 0 (negative y) — renormalize the
+  // whole canvas so the topmost node is still at y = 0, keeping compatibility with
+  // centerTree()'s pan math and anything else assuming the canvas starts at the origin.
+  const minY = out.nodes.reduce((min, n) => Math.min(min, n.y), 0);
+  if (minY < 0) {
+    out.nodes.forEach((n) => {
+      n.y -= minY;
+    });
+    out.links.forEach((l) => {
+      l.fromY -= minY;
+      l.toY -= minY;
+    });
+  }
+  out.height = out.nodes.reduce((max, n) => Math.max(max, n.y + NODE_H), 0);
 
   // Resolve each cross-link stub against the final canvas. If BOTH ends are actually
   // rendered here (e.g. Kasi+Dhanam and Vanaja, since Kasi's family isn't excluded),
