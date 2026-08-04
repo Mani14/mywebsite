@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { getDaysUntilBirthday, getFullName } from '../utils/familyUtils';
 import '../styles/BirthdayWidget.css';
@@ -40,8 +41,8 @@ export default function BirthdayWidget({ persons, onSelect }) {
           </button>
         ))}
       </div>
-      <button type="button" className="birthday-widget-close" onClick={dismiss} title="Dismiss">
-        ×
+      <button type="button" className="birthday-widget-close" onClick={dismiss} title="Dismiss" aria-label="Dismiss birthday reminders">
+        <X size={15} />
       </button>
     </div>
   );

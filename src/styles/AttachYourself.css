@@ -1,0 +1,104 @@
+.attach-step {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.attach-step-hint {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--color-text-muted, var(--color-text));
+}
+
+.attach-search-input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+
+.attach-search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.attach-search-results button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.attach-search-results button:hover {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.attach-step-empty {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted, var(--color-text));
+}
+
+.attach-this-is-me-btn {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-primary);
+  background: rgba(var(--color-primary-rgb), 0.1);
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.attach-this-is-me-btn:hover {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.attach-relation-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.attach-relation-options button {
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.attach-relation-options button:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.attach-back-btn {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--color-text-muted, var(--color-text));
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 0;
+}
+
+.attach-back-btn:hover {
+  color: var(--color-primary);
+}

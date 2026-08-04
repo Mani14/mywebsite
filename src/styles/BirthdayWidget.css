@@ -2,11 +2,18 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 20px;
+  padding: var(--space-2) var(--space-5);
   background: #fff7e6;
   border-bottom: 1px solid #f4d888;
   color: #6b4c02;
   font-size: 13px;
+  transition: background var(--duration-base) var(--ease);
+}
+
+[data-theme='dark'] .birthday-widget {
+  background: #3a2e08;
+  border-bottom-color: #5c4a10;
+  color: #f5d67a;
 }
 
 .birthday-widget-icon {
@@ -24,28 +31,32 @@
   border: none;
   background: none;
   padding: 0;
-  color: #6b4c02;
+  color: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
+  transition: opacity var(--duration-fast) var(--ease);
 }
 
 .birthday-widget-item:hover {
-  color: #3d2a00;
+  opacity: 0.7;
 }
 
 .birthday-widget-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: none;
-  color: #6b4c02;
-  font-size: 16px;
-  line-height: 1;
+  color: inherit;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 4px;
+  border-radius: 50%;
+  transition: background var(--duration-fast) var(--ease);
 }
 
 .birthday-widget-close:hover {
-  color: #3d2a00;
+  background: rgba(0, 0, 0, 0.08);
 }

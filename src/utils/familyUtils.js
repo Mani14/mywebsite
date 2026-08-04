@@ -415,6 +415,123 @@ export function getDaysUntilBirthday(dob, today = new Date()) {
   return Math.round((next - start) / 86400000);
 }
 
+// Direct children count plus one layer down (children's children) — a quick
+// "family size" indicator for the detail panel.
+export function getFamilyStats(persons, person) {
+  if (!person) return null;
+  const children = getChildren(persons, person);
+  const grandchildrenCount = children.reduce((sum, child) => sum + child.childrenIds.length, 0);
+  return {
+    childrenCount: children.length,
+    grandchildrenCount,
+    siblingsCount: getSiblings(persons, person).length,
+  };
+}
+
+// id -> generations-up distance map (0 = self), walking every recorded parent
+// (not just parentIds[0]) so both blood-lines are covered.
+function ancestorDistances(persons, id) {
+  const dist = new Map([[id, 0]]);
+  let frontier = [id];
+  let depth = 0;
+  while (frontier.length) {
+    depth += 1;
+    const next = [];
+    for (const curId of frontier) {
+      const cur = getPerson(persons, curId);
+      if (!cur) continue;
+      for (const parentId of cur.parentIds) {
+        if (!dist.has(parentId)) {
+          dist.set(parentId, depth);
+          next.push(parentId);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return dist;
+}
+
+const GREAT_PREFIXES = ['', 'Great-', 'Great-Great-'];
+function greatPrefix(n) {
+  if (n <= 0) return '';
+  if (n < GREAT_PREFIXES.length) return GREAT_PREFIXES[n];
+  return `${n}x-Great-`;
+}
+
+function ordinal(n) {
+  if (n % 10 === 1 && n % 100 !== 11) return `${n}st`;
+  if (n % 10 === 2 && n % 100 !== 12) return `${n}nd`;
+  if (n % 10 === 3 && n % 100 !== 13) return `${n}rd`;
+  return `${n}th`;
+}
+
+// Plain-language blood/marriage relationship of `personId` to `rootId` (e.g.
+// "Grandson", "Aunt", "2nd Cousin"), based on the nearest common recorded
+// ancestor. Returns null for the root themselves, an unrelated/unrecorded
+// pair, or when either id is missing.
+export function getRelationshipLabel(persons, personId, rootId) {
+  if (!personId || !rootId || personId === rootId) return null;
+  const person = getPerson(persons, personId);
+  const root = getPerson(persons, rootId);
+  if (!person || !root) return null;
+
+  if (person.spouseId === rootId) return 'Spouse';
+
+  const male = person.gender === 'male';
+  const female = person.gender === 'female';
+
+  const personAncestors = ancestorDistances(persons, personId);
+  const rootAncestors = ancestorDistances(persons, rootId);
+
+  let best = null;
+  for (const [ancestorId, distPerson] of personAncestors) {
+    const distRoot = rootAncestors.get(ancestorId);
+    if (distRoot == null) continue;
+    if (!best || distRoot + distPerson < best.distRoot + best.distPerson) {
+      best = { distRoot, distPerson };
+    }
+  }
+  if (!best) return null;
+  const { distRoot, distPerson } = best;
+
+  // root is the common ancestor: person descends from root.
+  if (distRoot === 0) {
+    if (distPerson === 1) return male ? 'Son' : female ? 'Daughter' : 'Child';
+    if (distPerson === 2) return male ? 'Grandson' : female ? 'Granddaughter' : 'Grandchild';
+    const prefix = greatPrefix(distPerson - 2);
+    return male ? `${prefix}Great-Grandson` : female ? `${prefix}Great-Granddaughter` : `${prefix}Great-Grandchild`;
+  }
+  // person is the common ancestor: root descends from person.
+  if (distPerson === 0) {
+    if (distRoot === 1) return male ? 'Father' : female ? 'Mother' : 'Parent';
+    if (distRoot === 2) return male ? 'Grandfather' : female ? 'Grandmother' : 'Grandparent';
+    const prefix = greatPrefix(distRoot - 2);
+    return male ? `${prefix}Great-Grandfather` : female ? `${prefix}Great-Grandmother` : `${prefix}Great-Grandparent`;
+  }
+  // Same generation from the shared ancestor: siblings or cousins.
+  if (distRoot === distPerson) {
+    if (distRoot === 1) return male ? 'Brother' : female ? 'Sister' : 'Sibling';
+    return `${ordinal(distRoot - 1)} Cousin`;
+  }
+  // Different generations, neither is the other's direct ancestor.
+  const removed = Math.abs(distRoot - distPerson);
+  if (distRoot < distPerson) {
+    if (distRoot === 1 && distPerson === 2) return male ? 'Nephew' : female ? 'Niece' : 'Nibling';
+    if (distRoot === 1) {
+      const prefix = greatPrefix(distPerson - 2);
+      return male ? `${prefix}Grand-Nephew` : female ? `${prefix}Grand-Niece` : `${prefix}Grand-Nibling`;
+    }
+    return `${ordinal(distRoot - 1)} Cousin, ${removed}x Removed`;
+  }
+  if (distPerson === 1 && distRoot === 2) return male ? 'Uncle' : female ? 'Aunt' : 'Aunt/Uncle';
+  if (distPerson === 1) {
+    const prefix = greatPrefix(distRoot - 2);
+    return male ? `${prefix}Grand-Uncle` : female ? `${prefix}Grand-Aunt` : `${prefix}Grand-Aunt/Uncle`;
+  }
+  return `${ordinal(distPerson - 1)} Cousin, ${removed}x Removed`;
+}
+
 let idCounter = 0;
 
 // Generates an id not present in the given persons map.
@@ -439,6 +556,7 @@ export function createEmptyPerson(id) {
     work: '',
     location: '',
     phone: '',
+    email: '',
     photo: '',
     notes: '',
     spouseId: '',
@@ -477,4 +595,195 @@ export function validateFamilyData(data) {
     return { valid: false, error: 'rootPersonId does not refer to a known person.' };
   }
   return { valid: true, error: null };
+}
+
+// Full array of ids from personId up through parentIds[0] to the top of their
+// primary blood line (dad-line priority, same convention as primaryLineageRoot) —
+// used to highlight a single person's lineage-to-root path in the tree view.
+export function getAncestorChain(persons, personId) {
+  const chain = [];
+  let current = getPerson(persons, personId);
+  const visited = new Set();
+  while (current && !visited.has(current.id)) {
+    chain.push(current.id);
+    visited.add(current.id);
+    current = getPerson(persons, current.parentIds[0]);
+  }
+  return chain;
+}
+
+// Scans the live dataset for structural problems: dangling references, mismatched
+// mirror relationships, likely duplicate people, and cyclical ancestry. Read-only —
+// callers are expected to fix issues manually via the existing edit UI.
+export function runDataHealthCheck(persons) {
+  const issues = [];
+  const ids = Object.keys(persons);
+  const addIssue = (severity, message, personIds = []) => issues.push({ severity, message, personIds });
+
+  ids.forEach((id) => {
+    const p = persons[id];
+    if (p.spouseId) {
+      if (p.spouseId === id) addIssue('error', `${getFullName(p)} is listed as their own spouse.`, [id]);
+      else if (!persons[p.spouseId])
+        addIssue('error', `${getFullName(p)}'s spouse reference points to a person that no longer exists.`, [id]);
+    }
+    if (p.parentIds.length > 2) {
+      addIssue('error', `${getFullName(p)} has more than 2 parents recorded (${p.parentIds.length}).`, [id]);
+    }
+    p.parentIds.forEach((pid) => {
+      if (pid === id) addIssue('error', `${getFullName(p)} is listed as their own parent.`, [id]);
+      else if (!persons[pid]) addIssue('error', `${getFullName(p)} has a parent reference that no longer exists.`, [id]);
+    });
+    p.childrenIds.forEach((cid) => {
+      if (cid === id) addIssue('error', `${getFullName(p)} is listed as their own child.`, [id]);
+      else if (!persons[cid]) addIssue('error', `${getFullName(p)} has a child reference that no longer exists.`, [id]);
+    });
+  });
+
+  ids.forEach((id) => {
+    const p = persons[id];
+    if (p.spouseId && persons[p.spouseId] && persons[p.spouseId].spouseId !== id) {
+      addIssue(
+        'warning',
+        `${getFullName(p)} lists ${getFullName(persons[p.spouseId])} as spouse, but not the other way around.`,
+        [id, p.spouseId]
+      );
+    }
+    p.childrenIds.forEach((cid) => {
+      const child = persons[cid];
+      if (child && !child.parentIds.includes(id)) {
+        addIssue(
+          'warning',
+          `${getFullName(p)} lists ${getFullName(child)} as a child, but the child doesn't list them as a parent.`,
+          [id, cid]
+        );
+      }
+    });
+    p.parentIds.forEach((pid) => {
+      const parent = persons[pid];
+      if (parent && !parent.childrenIds.includes(id)) {
+        addIssue(
+          'warning',
+          `${getFullName(p)} lists ${getFullName(parent)} as a parent, but the parent doesn't list them as a child.`,
+          [id, pid]
+        );
+      }
+    });
+  });
+
+  const byName = new Map();
+  ids.forEach((id) => {
+    const name = getFullName(persons[id]).toLowerCase().trim();
+    if (!name) return;
+    if (!byName.has(name)) byName.set(name, []);
+    byName.get(name).push(id);
+  });
+  byName.forEach((matchIds) => {
+    if (matchIds.length > 1) {
+      addIssue('warning', `${matchIds.length} people are named "${getFullName(persons[matchIds[0]])}" — possible duplicate.`, matchIds);
+    }
+  });
+
+  const cycleReported = new Set();
+  ids.forEach((id) => {
+    const stack = new Set();
+    const walk = (curId) => {
+      if (cycleReported.has(curId)) return;
+      if (stack.has(curId)) {
+        addIssue('error', `Circular ancestry detected involving ${getFullName(persons[curId])}.`, [curId]);
+        cycleReported.add(curId);
+        return;
+      }
+      const cur = persons[curId];
+      if (!cur) return;
+      stack.add(curId);
+      cur.parentIds.forEach((pid) => walk(pid));
+      stack.delete(curId);
+    };
+    walk(id);
+  });
+
+  return issues;
+}
+
+// Deepest generation count reachable from a single root (1 = the root alone).
+function maxDepthFrom(persons, id, visited = new Set()) {
+  if (visited.has(id)) return 0;
+  visited.add(id);
+  const person = getPerson(persons, id);
+  if (!person) return 0;
+  let maxChildDepth = 0;
+  for (const childId of person.childrenIds) {
+    maxChildDepth = Math.max(maxChildDepth, maxDepthFrom(persons, childId, visited));
+  }
+  return 1 + maxChildDepth;
+}
+
+// One-pass summary of the whole dataset for the stats bar/panel.
+export function computeFamilyStats(persons) {
+  const all = Object.values(persons);
+  const totalMembers = all.length;
+  let males = 0;
+  let females = 0;
+  let other = 0;
+  let alive = 0;
+  let deceased = 0;
+  let lifespanSum = 0;
+  let lifespanCount = 0;
+  const locationCounts = new Map();
+  const lastNameCounts = new Map();
+  const countedCouples = new Set();
+  let marriedCouples = 0;
+
+  all.forEach((p) => {
+    if (p.gender === 'male') males += 1;
+    else if (p.gender === 'female') females += 1;
+    else other += 1;
+
+    if (p.isAlive) alive += 1;
+    else deceased += 1;
+
+    if (!p.isAlive) {
+      const age = getAgeInfo(p);
+      if (age && age.label === 'Lived') {
+        lifespanSum += age.value;
+        lifespanCount += 1;
+      }
+    }
+
+    const location = p.location?.trim();
+    if (location) locationCounts.set(location, (locationCounts.get(location) || 0) + 1);
+
+    const lastName = p.lastName?.trim();
+    if (lastName) lastNameCounts.set(lastName, (lastNameCounts.get(lastName) || 0) + 1);
+
+    if (p.spouseId && persons[p.spouseId]) {
+      const pairKey = [p.id, p.spouseId].sort().join('|');
+      if (!countedCouples.has(pairKey)) {
+        countedCouples.add(pairKey);
+        marriedCouples += 1;
+      }
+    }
+  });
+
+  const topN = (map, n = 5) =>
+    [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([name, count]) => ({ name, count }));
+
+  const roots = getForestRoots(persons);
+  const generationCount = roots.reduce((max, r) => Math.max(max, maxDepthFrom(persons, r)), 0);
+
+  return {
+    totalMembers,
+    males,
+    females,
+    other,
+    alive,
+    deceased,
+    avgLifespanYears: lifespanCount ? Math.round((lifespanSum / lifespanCount) * 10) / 10 : null,
+    avgLifespanSampleSize: lifespanCount,
+    generationCount,
+    topLocations: topN(locationCounts),
+    topLastNames: topN(lastNameCounts),
+    marriedCouples,
+  };
 }

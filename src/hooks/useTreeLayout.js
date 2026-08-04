@@ -10,12 +10,12 @@ import {
 
 // Card + spacing geometry (in world pixels).
 export const NODE_W = 132;
-export const NODE_H = 116; // tall enough for a 2-line wrapped name below the avatar
+export const NODE_H = 120; // tall enough for a 2-line wrapped name below the avatar (+4 for the 60px avatar)
 export const COUPLE_GAP = 20; // space between a person and their spouse
 export const H_GAP = 40; // horizontal gap between sibling subtrees
 export const V_GAP = 84; // vertical gap between generations
 export const AVATAR_TOP = 6; // card padding-top before the avatar circle (must match CSS)
-export const AVATAR_SIZE = 56; // avatar circle diameter (must match CSS)
+export const AVATAR_SIZE = 60; // avatar circle diameter (must match CSS)
 
 function coupleWidth(persons, person) {
   const hasSpouse = person.spouseId && persons[person.spouseId];
@@ -141,6 +141,8 @@ function place(persons, id, depth, leftX, collapsed, out, visited, placed) {
     const childPerson = persons[c];
     const childHasSpouse = childPerson.spouseId && persons[childPerson.spouseId];
     out.links.push({
+      parentId: id,
+      childId: c,
       fromX: centerX,
       fromY: y + AVATAR_TOP + AVATAR_SIZE,
       toX: center - (childHasSpouse ? HALF_COUPLE_OFFSET : 0),
@@ -356,6 +358,8 @@ export function computeForestLayout(persons, rootIds, collapsed = new Set(), { e
     if (parentNode && childNode) {
       const childX = childAsSpouse ? childNode.x + HALF_COUPLE_OFFSET : childNode.x;
       out.links.push({
+        parentId,
+        childId,
         fromX: parentNode.x,
         fromY: parentNode.y + AVATAR_TOP + AVATAR_SIZE,
         toX: childX,

@@ -4,11 +4,10 @@
   right: 0;
   bottom: 0;
   width: 320px;
-  padding: 20px;
+  padding: var(--space-5);
   overflow-y: auto;
-  background: var(--color-surface);
-  border-left: 1px solid var(--color-border);
-  box-shadow: var(--shadow);
+  border-left: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-lg);
   z-index: 15;
 }
 
@@ -16,12 +15,22 @@
   position: absolute;
   top: 12px;
   right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   border: none;
+  border-radius: 50%;
   background: transparent;
-  font-size: 20px;
-  line-height: 1;
   color: var(--color-text-muted);
   cursor: pointer;
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+}
+
+.detail-close:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .detail-header {
@@ -65,12 +74,51 @@
   color: var(--color-text-muted);
 }
 
+.detail-badge-relation {
+  background: var(--color-primary-soft, var(--color-surface));
+  color: var(--color-primary);
+  margin-right: 4px;
+}
+
+.detail-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.detail-stat {
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.detail-stat strong {
+  color: var(--color-text);
+  margin-right: 4px;
+}
+
 .detail-fields {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin-bottom: 16px;
   font-size: 13px;
+}
+
+.detail-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+}
+
+.detail-field svg {
+  flex-shrink: 0;
+  color: var(--color-primary);
 }
 
 .detail-notes {
@@ -115,10 +163,11 @@
   padding: 4px 10px;
   font-size: 13px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--color-bg);
   color: var(--color-primary);
   cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
 .detail-link-row .detail-link {
@@ -128,6 +177,7 @@
 
 .detail-link:hover {
   border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Unlinks just this one relationship (spouse/parent/child) without deleting either
@@ -156,21 +206,46 @@
 }
 
 .detail-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 12px;
   font-size: 13px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
+  transition: background var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease),
+    box-shadow var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease);
 }
 
 .detail-actions button:hover {
   background: var(--color-bg);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.detail-actions button:active {
+  transform: translateY(0) scale(0.97);
 }
 
 .detail-delete {
   margin-left: auto;
   border-color: #dc2626 !important;
   color: #dc2626 !important;
+}
+
+@media (max-width: 640px) {
+  .person-detail {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: 80vh;
+    border-left: none;
+    border-top: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
 }

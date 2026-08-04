@@ -1,10 +1,23 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ChevronDown, Download, FileImage, FileText, Upload } from 'lucide-react';
 import { validateFamilyData } from '../utils/familyUtils';
 import '../styles/ImportExport.css';
 
-export default function ImportExport({ exportData, onImport }) {
+export default function ImportExport({ exportData, onImport, onExportImage, onExportPDF }) {
   const fileInputRef = useRef(null);
+  const menuRef = useRef(null);
   const [error, setError] = useState('');
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleClick = (e) => {
+      if (!menuRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
 
   const handleExport = () => {
     const data = exportData();
@@ -15,10 +28,12 @@ export default function ImportExport({ exportData, onImport }) {
     link.download = 'family.json';
     link.click();
     URL.revokeObjectURL(url);
+    setOpen(false);
   };
 
   const handleImportClick = () => {
     setError('');
+    setOpen(false);
     fileInputRef.current?.click();
   };
 
@@ -49,13 +64,51 @@ export default function ImportExport({ exportData, onImport }) {
   };
 
   return (
-    <div className="import-export">
-      <button type="button" onClick={handleExport} title="Download family data as JSON">
-        Export
+    <div className="import-export" ref={menuRef}>
+      <button
+        type="button"
+        className="icon-btn import-export-trigger"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Import and export options"
+        title="Import / export"
+      >
+        <Download size={17} />
+        <span className="btn-label">Data</span>
+        <ChevronDown size={14} className={`import-export-chevron ${open ? 'is-open' : ''}`} />
       </button>
-      <button type="button" onClick={handleImportClick} title="Replace family data from a JSON file">
-        Import
-      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="import-export-menu glass-surface"
+            role="menu"
+            initial={{ opacity: 0, y: -6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.96 }}
+            transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <button type="button" role="menuitem" onClick={handleExport}>
+              <Download size={15} /> Export JSON
+            </button>
+            <button type="button" role="menuitem" onClick={handleImportClick}>
+              <Upload size={15} /> Import JSON
+            </button>
+            {onExportImage && (
+              <button type="button" role="menuitem" onClick={() => { onExportImage(); setOpen(false); }}>
+                <FileImage size={15} /> Export Image
+              </button>
+            )}
+            {onExportPDF && (
+              <button type="button" role="menuitem" onClick={() => { onExportPDF(); setOpen(false); }}>
+                <FileText size={15} /> Export PDF
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <input
         ref={fileInputRef}
         type="file"

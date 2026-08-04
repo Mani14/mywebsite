@@ -34,6 +34,24 @@ export function useFamily() {
   const isFirstLoad = useRef(true);
   const saveTimer = useRef(null);
 
+  // Kept in sync so history snapshots always capture the true current state,
+  // regardless of which mutator's stale useCallback closure calls pushHistory.
+  const personsRef = useRef(persons);
+  useEffect(() => {
+    personsRef.current = persons;
+  }, [persons]);
+
+  // Undo/redo covers data edits only (add/update/delete/link/import) — NOT
+  // setRoot or view-mode changes, which live outside useFamily entirely.
+  const historyRef = useRef({ past: [], future: [] });
+  const HISTORY_LIMIT = 50;
+  const pushHistory = useCallback(() => {
+    const { past } = historyRef.current;
+    past.push(clone(personsRef.current));
+    if (past.length > HISTORY_LIMIT) past.shift();
+    historyRef.current.future = [];
+  }, []);
+
   // Load once: prefer stored data, fall back to bundled seed.
   useEffect(() => {
     const stored = loadFromStorage();
@@ -58,23 +76,26 @@ export function useFamily() {
 
   const addPerson = useCallback((partial) => {
     let newId;
+    pushHistory();
     setPersons((prev) => {
       newId = generateId(prev);
       const person = { ...createEmptyPerson(newId), ...partial, id: newId };
       return { ...prev, [newId]: person };
     });
     return newId;
-  }, []);
+  }, [pushHistory]);
 
   const updatePerson = useCallback((id, updates) => {
+    pushHistory();
     setPersons((prev) => {
       if (!prev[id]) return prev;
       return { ...prev, [id]: { ...prev[id], ...updates } };
     });
-  }, []);
+  }, [pushHistory]);
 
   // Removes a person and scrubs every reference to them.
   const deletePerson = useCallback((id) => {
+    pushHistory();
     setPersons((prev) => {
       if (!prev[id]) return prev;
       const next = {};
@@ -100,6 +121,7 @@ export function useFamily() {
   // Creates a child linked to the parent and the parent's spouse (if any).
   const addChild = useCallback((parentId, partial = {}) => {
     let newId;
+    pushHistory();
     setPersons((prev) => {
       const parent = prev[parentId];
       if (!parent) return prev;
@@ -121,11 +143,12 @@ export function useFamily() {
       return next;
     });
     return newId;
-  }, []);
+  }, [pushHistory]);
 
   // Creates a spouse and links both people to each other.
   const addSpouse = useCallback((personId, partial = {}) => {
     let newId;
+    pushHistory();
     setPersons((prev) => {
       const person = prev[personId];
       if (!person || person.spouseId) return prev;
@@ -144,11 +167,12 @@ export function useFamily() {
       };
     });
     return newId;
-  }, []);
+  }, [pushHistory]);
 
   // Creates a parent linked to the person; pairs them with an existing spouseless parent.
   const addParent = useCallback((personId, partial = {}) => {
     let newId;
+    pushHistory();
     setPersons((prev) => {
       const person = prev[personId];
       if (!person || person.parentIds.length >= 2) return prev;
@@ -173,7 +197,7 @@ export function useFamily() {
       return next;
     });
     return newId;
-  }, []);
+  }, [pushHistory]);
 
   // Creates a sibling sharing the same parent(s). If personId has no recorded
   // parents yet (e.g. a lineage root), auto-creates a shared "Unknown Parent"
@@ -181,6 +205,7 @@ export function useFamily() {
   // somewhere to attach without inventing a fake, fully-specified parent.
   const addSibling = useCallback((personId, partial = {}) => {
     let newId;
+    pushHistory();
     setPersons((prev) => {
       const person = prev[personId];
       if (!person) return prev;
@@ -221,13 +246,14 @@ export function useFamily() {
       return next;
     });
     return newId;
-  }, []);
+  }, [pushHistory]);
 
   // Wires up a relationship between two ALREADY-EXISTING people (no new person
   // created), mirroring addParent/addSpouse/addChild/addSibling's edge-setting —
   // used by PersonForm's "Link Existing" tab. Eligibility (no cycles, no
   // duplicate roles) is enforced upstream by familyUtils' getEligibleLinkCandidates.
   const linkExisting = useCallback((personId, relation, existingId) => {
+    pushHistory();
     setPersons((prev) => {
       const person = prev[personId];
       const other = prev[existingId];
@@ -283,11 +309,12 @@ export function useFamily() {
 
       return next;
     });
-  }, []);
+  }, [pushHistory]);
 
   // Clears a mutual spouse link (both sides), including any recorded marriage date.
   // Neither person is deleted — just the relationship between them.
   const removeSpouse = useCallback((personId) => {
+    pushHistory();
     setPersons((prev) => {
       const person = prev[personId];
       if (!person?.spouseId) return prev;
@@ -298,12 +325,13 @@ export function useFamily() {
       }
       return next;
     });
-  }, []);
+  }, [pushHistory]);
 
   // Removes one specific parent-child edge (both directions) without touching any
   // other relationship — e.g. fixing a single wrongly-recorded parent while leaving
   // the other parent and all other relatives untouched.
   const removeParent = useCallback((personId, parentId) => {
+    pushHistory();
     setPersons((prev) => {
       const person = prev[personId];
       if (!person || !person.parentIds.includes(parentId)) return prev;
@@ -319,9 +347,10 @@ export function useFamily() {
       }
       return next;
     });
-  }, []);
+  }, [pushHistory]);
 
   const removeChild = useCallback((personId, childId) => {
+    pushHistory();
     setPersons((prev) => {
       const person = prev[personId];
       if (!person || !person.childrenIds.includes(childId)) return prev;
@@ -337,7 +366,7 @@ export function useFamily() {
       }
       return next;
     });
-  }, []);
+  }, [pushHistory]);
 
   const setRoot = useCallback((id) => {
     setRootPersonId((prev) => (persons[id] ? id : prev));
@@ -345,11 +374,31 @@ export function useFamily() {
 
   // Replaces the entire dataset (used by import). Assumes data is pre-validated.
   const replaceAll = useCallback((data) => {
+    pushHistory();
     setPersons(clone(data.persons));
     setRootPersonId(data.rootPersonId || Object.keys(data.persons)[0] || null);
-  }, []);
+  }, [pushHistory]);
 
   const exportData = useCallback(() => clone({ rootPersonId, persons }), [rootPersonId, persons]);
+
+  // past/future are read directly off the ref (not state) — every push/pop
+  // happens alongside a setPersons call, so the re-render it triggers always
+  // sees up-to-date lengths here without a separate piece of state to sync.
+  const undo = useCallback(() => {
+    const { past, future } = historyRef.current;
+    if (past.length === 0) return;
+    const previous = past.pop();
+    future.push(clone(personsRef.current));
+    setPersons(previous);
+  }, []);
+
+  const redo = useCallback(() => {
+    const { past, future } = historyRef.current;
+    if (future.length === 0) return;
+    const next = future.pop();
+    past.push(clone(personsRef.current));
+    setPersons(next);
+  }, []);
 
   return {
     persons,
@@ -369,5 +418,9 @@ export function useFamily() {
     setRoot,
     replaceAll,
     exportData,
+    undo,
+    redo,
+    canUndo: historyRef.current.past.length > 0,
+    canRedo: historyRef.current.future.length > 0,
   };
 }

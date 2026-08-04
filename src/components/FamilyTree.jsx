@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { useForestLayout, usePedigreeLayout } from '../hooks/useTreeLayout';
 import { getForestRoots, getLineageRootIds } from '../utils/familyUtils';
 import ConnectorLines from './ConnectorLines';
+import MiniMap from './MiniMap';
 import TreeNode from './TreeNode';
 import '../styles/FamilyTree.css';
 
@@ -19,7 +20,10 @@ const MAX_ZOOM = 2;
 // whose lineage traces to a tiny satellite cluster would shove that cluster to the
 // front of the claim order, stealing a shared branch away from the real family and
 // making it vanish entirely once that tiny cluster gets excluded as a satellite.
-export default function FamilyTree({ persons, rootId, priorityId, collapsed, mode = 'forest', onSelect, onToggle, onQuickAdd, onJumpTo }) {
+const FamilyTree = forwardRef(function FamilyTree(
+  { persons, rootId, priorityId, collapsed, mode = 'forest', highlightedIds, meId, onSelect, onToggle, onQuickAdd, onJumpTo },
+  exportRef
+) {
   const rootIds = useMemo(
     () => getForestRoots(persons, priorityId ?? rootId),
     [persons, priorityId, rootId]
@@ -35,6 +39,25 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
     () => new Set(layout.nodes.flatMap((n) => (n.spouse ? [n.id, n.spouse.id] : [n.id]))),
     [layout]
   );
+
+  // Every "parentId|childId" pair where both ends are on the highlighted
+  // lineage-to-root chain — handed to ConnectorLines so it can draw that
+  // specific run of connectors a second time, in the highlight colour.
+  // A couple's connector is always anchored to whichever spouse the layout used
+  // as its placement id, which isn't necessarily the one getAncestorChain walked
+  // through (parentIds[0]) — so a link also counts as highlighted when its
+  // parentId's SPOUSE is the chain member, not just an exact id match.
+  const highlightedPairs = useMemo(() => {
+    if (!highlightedIds?.size) return null;
+    const pairs = new Set();
+    layout.links.forEach(({ parentId, childId }) => {
+      if (!parentId || !childId || !highlightedIds.has(childId)) return;
+      const parentOnChain =
+        highlightedIds.has(parentId) || highlightedIds.has(persons[parentId]?.spouseId);
+      if (parentOnChain) pairs.add(`${parentId}|${childId}`);
+    });
+    return pairs;
+  }, [layout.links, highlightedIds, persons]);
 
   // Dad-side/mom-side highlighting: whichever two lineage trees are the current
   // focus person's father's and mother's, tinted so their halves of the diagram
@@ -55,9 +78,15 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
   const [pan, setPan] = useState({ x: 0, y: 40 });
   const drag = useRef(null);
   const didCenter = useRef(false);
-  // Gates the CSS transition below — on while zooming (buttons/wheel) so the jump
+  // Gates the CSS transition below — on while zooming via the +/- buttons so the jump
   // eases in smoothly, off while drag-panning so the tree tracks the cursor instantly.
   const [isDragging, setIsDragging] = useState(false);
+  // Also off while wheel/trackpad-zooming: a wheel burst fires many ticks per second,
+  // and re-triggering the 220ms ease on every tick made the view visibly lag ~250ms
+  // behind the input (each new tick restarts the ease from the current in-flight
+  // position toward a new target). Wheel zoom instead tracks 1:1, like dragging.
+  const [isWheeling, setIsWheeling] = useState(false);
+  const wheelTimeoutRef = useRef(null);
   // Mirrors `zoom` for synchronous reads inside zoomAt/handleWheel/zoomBy, since those
   // need the up-to-date value without waiting for a re-render (state setter callbacks
   // firing back-to-back, e.g. rapid wheel events, would otherwise read a stale `zoom`).
@@ -65,6 +94,19 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
+
+  // Tracked purely for the mini-map, so its viewport rectangle stays accurate
+  // across window/panel resizes without the main pan/zoom logic depending on it.
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return undefined;
+    const update = () => setViewportSize({ width: el.clientWidth, height: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Centres the viewport on the focus person's node (falls back to tree centre).
   const centerTree = useCallback(() => {
@@ -135,6 +177,9 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
       // Anchor on the viewport centre (not the cursor) so wheel zoom matches the
       // +/- buttons and always zooms toward what's currently in the middle of the screen.
       zoomAt(el.clientWidth / 2, el.clientHeight / 2, next);
+      setIsWheeling(true);
+      clearTimeout(wheelTimeoutRef.current);
+      wheelTimeoutRef.current = setTimeout(() => setIsWheeling(false), 150);
     },
     [zoomAt]
   );
@@ -186,6 +231,39 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
     centerTree();
   };
 
+  // Mini-map click/drag: re-centre the viewport on the tree-space point clicked,
+  // at whatever zoom level is currently active.
+  const handleMiniMapNavigate = useCallback((treeX, treeY) => {
+    const el = containerRef.current;
+    if (!el) return;
+    setPan({
+      x: el.clientWidth / 2 - treeX * zoomRef.current,
+      y: el.clientHeight / 2 - treeY * zoomRef.current,
+    });
+  }, []);
+
+  // Exposed to App.jsx (via ref) for the Export Image/PDF buttons — captures
+  // exactly what's currently visible in the viewport, not the whole tree, since
+  // large trees can be enormous once fully unrolled.
+  useImperativeHandle(exportRef, () => ({
+    async exportImage() {
+      const { default: html2canvas } = await import('html2canvas');
+      const canvas = await html2canvas(containerRef.current, { backgroundColor: null });
+      const link = document.createElement('a');
+      link.download = 'family-tree.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    },
+    async exportPDF() {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
+      const canvas = await html2canvas(containerRef.current, { backgroundColor: '#ffffff' });
+      const orientation = canvas.width >= canvas.height ? 'landscape' : 'portrait';
+      const pdf = new jsPDF({ orientation, unit: 'px', format: [canvas.width, canvas.height] });
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save('family-tree.pdf');
+    },
+  }));
+
   return (
     <div className="tree-viewport">
       <div
@@ -201,17 +279,20 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
           className="tree-world"
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+            transition: isDragging || isWheeling ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
-          <ConnectorLines links={layout.links} width={layout.width} height={layout.height} />
-          {layout.nodes.map((node) => (
+          <ConnectorLines links={layout.links} width={layout.width} height={layout.height} highlightedPairs={highlightedPairs} />
+          {layout.nodes.map((node, index) => (
             <TreeNode
               key={node.id}
               node={node}
+              index={index}
               focusId={rootId}
               renderedIds={renderedIds}
               side={sideOf(node)}
+              highlightedIds={highlightedIds}
+              meId={meId}
               onSelect={onSelect}
               onToggle={onToggle}
               onQuickAdd={onQuickAdd}
@@ -221,6 +302,16 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
         </div>
       </div>
 
+      <MiniMap
+        nodes={layout.nodes}
+        treeWidth={layout.width}
+        treeHeight={layout.height}
+        pan={pan}
+        zoom={zoom}
+        viewportSize={viewportSize}
+        onNavigate={handleMiniMapNavigate}
+      />
+
       <div className="tree-controls">
         <button type="button" onClick={() => zoomBy(0.15)} title="Zoom in">+</button>
         <button type="button" onClick={() => zoomBy(-0.15)} title="Zoom out">{'\u2212'}</button>
@@ -228,4 +319,6 @@ export default function FamilyTree({ persons, rootId, priorityId, collapsed, mod
       </div>
     </div>
   );
-}
+});
+
+export default FamilyTree;

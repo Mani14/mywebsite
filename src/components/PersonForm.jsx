@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { getEligibleLinkCandidates, getFullName } from '../utils/familyUtils';
+import Modal from './Modal';
 import '../styles/PersonForm.css';
 
 const emptyForm = {
@@ -12,6 +13,7 @@ const emptyForm = {
   work: '',
   location: '',
   phone: '',
+  email: '',
   photo: '',
   notes: '',
   marriageDate: '',
@@ -65,8 +67,8 @@ export default function PersonForm({
   };
 
   return (
-    <div className="person-form-overlay" onClick={onCancel}>
-      <form className="person-form" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
+    <Modal isOpen onClose={onCancel} title={title} width="560px">
+      <form className="person-form" onSubmit={handleSubmit}>
         <h2>{title}</h2>
         {error && <p className="person-form-error">{error}</p>}
 
@@ -184,6 +186,11 @@ export default function PersonForm({
         </div>
 
         <label>
+          Email (optional)
+          <input type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} />
+        </label>
+
+        <label>
           Photo (optional)
           <input type="file" accept="image/*" onChange={handlePhotoChange} />
         </label>
@@ -206,6 +213,6 @@ export default function PersonForm({
         </>
         )}
       </form>
-    </div>
+    </Modal>
   );
 }

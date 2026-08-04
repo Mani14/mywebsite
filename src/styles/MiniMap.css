@@ -1,0 +1,39 @@
+.mini-map {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  width: 170px;
+  height: 120px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--shadow-md);
+  cursor: crosshair;
+  overflow: hidden;
+  opacity: 0.85;
+  transition: opacity var(--duration-base) var(--ease), box-shadow var(--duration-base) var(--ease);
+}
+
+.mini-map:hover {
+  opacity: 1;
+  box-shadow: var(--shadow-lg);
+}
+
+.mini-map-dot {
+  fill: var(--color-connector);
+}
+
+.mini-map-viewport {
+  fill: rgba(var(--color-primary-rgb), 0.15);
+  stroke: var(--color-primary);
+  stroke-width: 1.5;
+  transition: x var(--duration-fast) var(--ease), y var(--duration-fast) var(--ease);
+}
+
+@media (max-width: 640px) {
+  .mini-map {
+    display: none;
+  }
+}

@@ -1,10 +1,12 @@
+import { AnimatePresence, motion } from 'framer-motion';
+import { BadgeCheck, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { getFullName } from '../utils/familyUtils';
 import '../styles/SearchBar.css';
 
 const MAX_RESULTS = 8;
 
-export default function SearchBar({ persons, onSelect }) {
+export default function SearchBar({ persons, onSelect, meId, onSetMe }) {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
 
@@ -33,6 +35,7 @@ export default function SearchBar({ persons, onSelect }) {
 
   return (
     <div className="search-bar">
+      <Search size={14} className="search-bar-icon" />
       <input
         type="text"
         className="search-bar-input"
@@ -46,21 +49,43 @@ export default function SearchBar({ persons, onSelect }) {
         onBlur={() => setTimeout(() => setIsOpen(false), 150)}
         onKeyDown={handleKeyDown}
       />
-      {isOpen && query.trim() && (
-        <ul className="search-bar-results">
-          {matches.length > 0 ? (
-            matches.map((person) => (
-              <li key={person.id}>
-                <button type="button" onClick={() => handleSelect(person.id)}>
-                  {getFullName(person)}
-                </button>
-              </li>
-            ))
-          ) : (
-            <li className="search-bar-empty">No matches</li>
-          )}
-        </ul>
-      )}
+      <AnimatePresence>
+        {isOpen && query.trim() && (
+          <motion.ul
+            className="search-bar-results glass-surface"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+          >
+            {matches.length > 0 ? (
+              matches.map((person) => {
+                const isMe = !!meId && meId === person.id;
+                return (
+                  <li key={person.id} className="search-bar-result-row">
+                    <button type="button" onClick={() => handleSelect(person.id)}>
+                      {getFullName(person)}
+                    </button>
+                    {onSetMe && (
+                      <button
+                        type="button"
+                        className={`search-bar-mark-me${isMe ? ' is-me' : ''}`}
+                        title={isMe ? 'This is you' : 'Mark as Me'}
+                        aria-label={isMe ? `${getFullName(person)} is marked as you` : `Mark ${getFullName(person)} as you`}
+                        onClick={() => onSetMe(isMe ? null : person.id)}
+                      >
+                        <BadgeCheck size={14} />
+                      </button>
+                    )}
+                  </li>
+                );
+              })
+            ) : (
+              <li className="search-bar-empty">No matches</li>
+            )}
+          </motion.ul>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

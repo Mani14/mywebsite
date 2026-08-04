@@ -1,0 +1,74 @@
+.stats-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stats-panel h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.stats-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.stats-panel-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  text-align: center;
+}
+
+.stats-panel-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.stats-panel-label {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+.stats-panel-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.stats-panel-row-label {
+  color: var(--color-text-muted);
+}
+
+.stats-panel-section h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.stats-panel-section ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.stats-panel-section li {
+  display: flex;
+  justify-content: space-between;
+}
+
+.stats-panel-count {
+  color: var(--color-text-muted);
+}

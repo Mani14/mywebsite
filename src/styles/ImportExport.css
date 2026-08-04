@@ -1,24 +1,57 @@
 .import-export {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.import-export button {
-  font-family: var(--font);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
+.import-export-trigger {
+  gap: 6px;
 }
 
-.import-export button:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+.import-export-chevron {
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.import-export-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.import-export-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 190px;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.import-export-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-family: var(--font);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+}
+
+.import-export-menu button:hover {
+  background: var(--color-primary);
+  color: #fff;
 }
 
 .import-export-error {

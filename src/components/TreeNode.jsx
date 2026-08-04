@@ -1,3 +1,5 @@
+import { motion, useReducedMotion } from 'framer-motion';
+import { ArrowUpRight, BadgeCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { NODE_W, NODE_H, COUPLE_GAP, AVATAR_SIZE } from '../hooks/useTreeLayout';
 import { getFullName, getInitials } from '../utils/familyUtils';
@@ -17,11 +19,19 @@ const QUICK_ADD_OPTIONS = [
   { mode: 'addSibling', label: 'Add Sibling', show: () => true },
 ];
 
-function MiniCard({ person, isFocus, hasSpouse, showJumpLink, onSelect, onQuickAdd, onJumpTo }) {
+function MiniCard({ person, isFocus, isHighlighted, isMe, hasSpouse, showJumpLink, onSelect, onQuickAdd, onJumpTo }) {
   const genderClass = `avatar avatar-${person.gender}`;
   const deceased = !person.isAlive;
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef(null);
+  const prefersReducedMotion = useReducedMotion();
+  const avatarSpring = prefersReducedMotion
+    ? {}
+    : {
+        whileHover: { y: -3, scale: 1.08 },
+        whileTap: { scale: 0.94 },
+        transition: { type: 'spring', stiffness: 320, damping: 18 },
+      };
 
   // Closes the quick-add menu on any click outside this card.
   useEffect(() => {
@@ -42,14 +52,17 @@ function MiniCard({ person, isFocus, hasSpouse, showJumpLink, onSelect, onQuickA
     >
       <button
         type="button"
-        className={`mini-card${deceased ? ' mini-card-deceased' : ''}${isFocus ? ' mini-card-focus' : ''}`}
+        className={`mini-card${deceased ? ' mini-card-deceased' : ''}${isFocus ? ' mini-card-focus' : ''}${isHighlighted ? ' mini-card-highlighted' : ''}`}
         style={{ width: NODE_W, height: NODE_H }}
         onClick={() => onSelect(person.id)}
         title={getFullName(person)}
       >
-        <span className={genderClass}>
-          {person.photo ? <img src={person.photo} alt="" /> : getInitials(person)}
-        </span>
+        <motion.span className="mini-card-avatar-wrap" tabIndex={-1} {...avatarSpring}>
+          <span className={genderClass}>
+            {person.photo ? <img src={person.photo} alt="" /> : getInitials(person)}
+          </span>
+          {isMe && <BadgeCheck className="mini-card-me-badge" size={16} />}
+        </motion.span>
         <span className="mini-name">
           {deceased && <span className="dagger">†</span>}
           {getFullName(person)}
@@ -66,7 +79,7 @@ function MiniCard({ person, isFocus, hasSpouse, showJumpLink, onSelect, onQuickA
             onJumpTo(person.id);
           }}
         >
-          🔗
+          <ArrowUpRight size={14} strokeWidth={2.5} />
         </button>
       )}
 
@@ -107,10 +120,21 @@ function MiniCard({ person, isFocus, hasSpouse, showJumpLink, onSelect, onQuickA
 }
 
 // A positioned node holding a person (and optional spouse) plus an expand toggle.
-export default function TreeNode({ node, focusId, renderedIds, side, onSelect, onToggle, onQuickAdd, onJumpTo }) {
+export default function TreeNode({ node, index, focusId, renderedIds, side, highlightedIds, meId, onSelect, onToggle, onQuickAdd, onJumpTo }) {
   const { person, spouse, x, y, coupleWidth } = node;
   const left = x - coupleWidth / 2;
   const sideClass = side ? ` couple-side-${side}` : '';
+
+  // Staggered fade/scale-in on mount (expand, root switch, edits) — capped so deep
+  // trees don't get a sluggish cascading reveal; skipped for reduced-motion users.
+  const prefersReducedMotion = useReducedMotion();
+  const entrance = prefersReducedMotion
+    ? { initial: false }
+    : {
+        initial: { opacity: 0, y: 8, scale: 0.96 },
+        animate: { opacity: 1, y: 0, scale: 1 },
+        transition: { duration: 0.28, delay: Math.min((index ?? 0) * 0.02, 0.3), ease: [0.4, 0, 0.2, 1] },
+      };
 
   // A shared placeholder parent auto-created by "Add Sibling" (see useFamily's
   // addSibling) is never drawn as its own card — instead its row shows the same
@@ -118,7 +142,7 @@ export default function TreeNode({ node, focusId, renderedIds, side, onSelect, o
   // one in edits this placeholder in place rather than adding a brand new person.
   if (person.isPlaceholder) {
     return (
-      <div className="tree-node" style={{ left, top: y, width: coupleWidth }}>
+      <motion.div className="tree-node" style={{ left, top: y, width: coupleWidth }} {...entrance}>
         <div className="couple parent-only-node">
           <button
             type="button"
@@ -144,16 +168,18 @@ export default function TreeNode({ node, focusId, renderedIds, side, onSelect, o
             <span className="parent-placeholder-label">Add mother</span>
           </button>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="tree-node" style={{ left, top: y, width: coupleWidth }}>
+    <motion.div className="tree-node" style={{ left, top: y, width: coupleWidth }} {...entrance}>
       <div className={`couple${sideClass}`}>
         <MiniCard
           person={person}
           isFocus={person.id === focusId}
+          isHighlighted={!!highlightedIds?.has(person.id)}
+          isMe={!!meId && person.id === meId}
           hasSpouse={!!spouse}
           onSelect={onSelect}
           onQuickAdd={onQuickAdd}
@@ -174,6 +200,8 @@ export default function TreeNode({ node, focusId, renderedIds, side, onSelect, o
           <MiniCard
             person={spouse}
             isFocus={spouse.id === focusId}
+            isHighlighted={!!highlightedIds?.has(spouse.id)}
+            isMe={!!meId && spouse.id === meId}
             hasSpouse
             // Anyone married in who has their own recorded parents has a family
             // tree of their own somewhere — offer a jump link to it UNLESS that
@@ -198,6 +226,6 @@ export default function TreeNode({ node, focusId, renderedIds, side, onSelect, o
           {node.collapsed ? '+' : '\u2212'}
         </button>
       )}
-    </div>
+    </motion.div>
   );
 }

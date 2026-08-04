@@ -18,6 +18,21 @@
   cursor: grabbing;
 }
 
+.connector-highlight {
+  animation: connector-draw-in var(--duration-slow) var(--ease);
+}
+
+@keyframes connector-draw-in {
+  from {
+    opacity: 0;
+    stroke-width: 8;
+  }
+  to {
+    opacity: 1;
+    stroke-width: 4;
+  }
+}
+
 .tree-world {
   position: absolute;
   top: 0;
@@ -35,7 +50,8 @@
   display: flex;
   align-items: stretch;
   justify-content: center;
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
+  transition: background var(--duration-base) var(--ease), box-shadow var(--duration-base) var(--ease);
 }
 
 /* Dad-side/mom-side highlight: tints every couple drawn from the current focus
@@ -74,22 +90,75 @@
 }
 
 .mini-card:hover .avatar {
-  transform: translateY(-2px) scale(1.08);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18), 0 0 0 3px var(--color-primary);
+  box-shadow: var(--shadow-lg), 0 0 20px 2px rgba(var(--color-primary-rgb), 0.3);
+}
+
+.mini-card-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.mini-card-me-badge {
+  position: absolute;
+  bottom: 2px;
+  right: -2px;
+  color: #fff;
+  background: var(--color-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+
+.mini-card:hover .avatar-male {
+  box-shadow: var(--shadow-lg), 0 0 22px 4px rgba(var(--color-male-rgb), 0.4);
+}
+
+.mini-card:hover .avatar-female {
+  box-shadow: var(--shadow-lg), 0 0 22px 4px rgba(var(--color-female-rgb), 0.4);
+}
+
+.mini-card:hover .avatar-other {
+  box-shadow: var(--shadow-lg), 0 0 22px 4px rgba(var(--color-other-rgb), 0.4);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mini-card:hover .avatar {
+    animation: avatar-glow-pulse 1.6s var(--ease) infinite;
+  }
+}
+
+@keyframes avatar-glow-pulse {
+  0%,
+  100% {
+    filter: brightness(1) saturate(1);
+  }
+  50% {
+    filter: brightness(1.12) saturate(1.15);
+  }
 }
 
 .mini-card-deceased .avatar {
   opacity: 0.6;
   filter: grayscale(35%);
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.25), inset 0 -3px 5px rgba(0, 0, 0, 0.3), var(--shadow-sm);
 }
 
 .mini-card-focus .avatar {
-  box-shadow: 0 0 0 4px var(--color-focus, #f5b301), 0 0 16px 2px rgba(245, 179, 1, 0.6);
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 6px var(--color-focus, #f5b301),
+    0 0 20px 4px rgba(var(--color-focus-rgb), 0.5);
+}
+
+/* Highlighted lineage-to-root chain (see App's highlightedChain / PersonDetail's
+   "Highlight Lineage" button) — a persistent ring independent of focus/deceased
+   styling, so it reads clearly even on a deceased or currently-focused card. */
+.mini-card-highlighted .avatar {
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 6px var(--color-highlight),
+    0 0 18px 3px rgba(var(--color-highlight-rgb), 0.45);
 }
 
 .avatar {
-  width: 56px;
-  height: 56px;
+  --halo-rgb: var(--color-primary-rgb);
+  width: 60px;
+  height: 60px;
   flex-shrink: 0;
   border-radius: 50%;
   display: flex;
@@ -98,21 +167,42 @@
   color: #fff;
   font-weight: 700;
   font-size: 16px;
+  letter-spacing: 0.3px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   overflow: hidden;
   border: 3px solid;
-  transition: box-shadow 0.15s, transform 0.15s;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: box-shadow var(--duration-base) var(--ease), transform var(--duration-base) var(--ease);
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.35), inset 0 -3px 5px rgba(0, 0, 0, 0.22), var(--shadow-sm),
+    0 0 14px 2px rgba(var(--halo-rgb), 0.18);
 }
 
 .avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.25);
+  transition: transform var(--duration-base) var(--ease);
 }
 
-.avatar-male { background: var(--color-male); border-color: var(--color-male-ring, #2c8ea3); }
-.avatar-female { background: var(--color-female); border-color: var(--color-female-ring, #e08b2f); }
-.avatar-other { background: var(--color-other); border-color: var(--color-other); }
+.mini-card:hover .avatar img {
+  transform: scale(1.06);
+}
+
+.avatar-male {
+  --halo-rgb: var(--color-male-rgb);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-male) 55%, white 45%), var(--color-male));
+  border-color: var(--color-male-ring, #2c8ea3);
+}
+.avatar-female {
+  --halo-rgb: var(--color-female-rgb);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-female) 55%, white 45%), var(--color-female));
+  border-color: var(--color-female-ring, #e08b2f);
+}
+.avatar-other {
+  --halo-rgb: var(--color-other-rgb);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-other) 55%, white 45%), var(--color-other));
+  border-color: var(--color-other);
+}
 
 .mini-name {
   font-size: 12px;
@@ -167,8 +257,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   border: 2px dashed var(--color-connector);
   font-size: 20px;
@@ -192,10 +282,10 @@
   flex-shrink: 0;
 }
 
-/* Anchored to the bottom edge of the 56px avatar circle (6px card padding + 56px avatar). */
+/* Anchored to the bottom edge of the 60px avatar circle (6px card padding + 60px avatar, pulled up 12px to overlap the ring). */
 .mini-card-add-anchor {
   position: absolute;
-  top: 50px;
+  top: 54px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 3;
@@ -207,16 +297,17 @@
   height: 22px;
   border-radius: 50%;
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: linear-gradient(145deg, var(--color-surface), color-mix(in srgb, var(--color-surface) 85%, var(--color-primary) 15%));
   color: var(--color-primary);
   font-size: 15px;
   line-height: 1;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-md);
   opacity: 0;
   transform: scale(0.85);
-  transition: opacity 0.12s, transform 0.12s;
+  transition: opacity var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease),
+    background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
 }
 
 .mini-card-wrap:hover .mini-card-add,
@@ -234,35 +325,37 @@
    than a floating extra. Filled with the primary accent colour (rather than a neutral
    outline) so it reads as a distinct, noticeable affordance rather than a subtle
    detail — this is the one badge in the app that opens a whole different view.
-   Geometry: avatar is 56px, 6px from the card top, centered in the 132px-wide card
-   (NODE_W/AVATAR_SIZE/AVATAR_TOP in useTreeLayout.js) — centre (66, 34), radius 28;
-   a 22px badge centred on the ring's 45° point lands ~(75, 3).
+   Geometry: avatar is 60px, 6px from the card top, centered in the 132px-wide card
+   (NODE_W/AVATAR_SIZE/AVATAR_TOP in useTreeLayout.js) — centre (66, 36), radius 30;
+   a 22px badge centred on the ring's 45° point lands ~(76, 4).
 */
 .mini-card-jump {
   position: absolute;
-  top: 3px;
-  left: 75px;
+  top: 4px;
+  left: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 22px;
   height: 22px;
+  padding: 0;
   border-radius: 50%;
   border: 2px solid var(--color-surface);
-  background: var(--color-primary);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-primary) 60%, white 40%), var(--color-primary));
   color: #fff;
-  font-size: 12px;
-  line-height: 1;
   cursor: pointer;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-md);
   z-index: 3;
-  transition: transform 0.12s, box-shadow 0.12s;
+  transition: transform var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
 .mini-card-jump:hover {
   transform: scale(1.15);
-  box-shadow: 0 0 0 2px var(--color-primary), var(--shadow);
+  box-shadow: 0 0 0 2px var(--color-primary), var(--shadow-md);
 }
 
 .mini-card-add:hover {
-  background: var(--color-primary);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-primary) 70%, white 30%), var(--color-primary));
   color: #fff;
   border-color: var(--color-primary);
 }
@@ -276,17 +369,15 @@
   display: flex;
   flex-direction: column;
   min-width: 130px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
   z-index: 4;
 }
 
 .mini-card-menu button {
   border: none;
-  background: transparent;
+  background: var(--color-surface);
   color: var(--color-text);
   font-family: var(--font);
   font-size: 12px;
@@ -294,6 +385,7 @@
   padding: 8px 10px;
   cursor: pointer;
   white-space: nowrap;
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
 }
 
 .mini-card-menu button:hover {
@@ -310,19 +402,22 @@
   height: 24px;
   border-radius: 50%;
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: linear-gradient(145deg, var(--color-surface), color-mix(in srgb, var(--color-surface) 85%, var(--color-text) 8%));
   color: var(--color-text);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-md);
   z-index: 2;
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease),
+    transform var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease);
 }
 
 .toggle-btn:hover {
-  background: var(--color-primary);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-primary) 70%, white 30%), var(--color-primary));
   color: #fff;
   border-color: var(--color-primary);
+  transform: translateX(-50%) scale(1.1);
 }
 
 /* Floating zoom controls */
@@ -333,20 +428,27 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding: 6px;
+  border-radius: var(--radius-lg);
 }
 
 .tree-controls button {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: 18px;
   cursor: pointer;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
+  transition: background var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease),
+    box-shadow var(--duration-fast) var(--ease);
 }
 
 .tree-controls button:hover {
-  background: var(--color-bg);
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }

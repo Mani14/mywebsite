@@ -1,16 +1,26 @@
 :root {
-  --color-bg: #f1f5f9;
+  --color-bg: #eef2f9;
+  --color-bg-gradient:
+    radial-gradient(circle at 12% -10%, rgba(96, 165, 250, 0.16) 0%, transparent 42%),
+    radial-gradient(circle at 88% 108%, rgba(224, 139, 47, 0.12) 0%, transparent 40%),
+    var(--color-bg);
   --color-surface: #ffffff;
   --color-border: #e2e8f0;
   --color-text: #1e293b;
   --color-text-muted: #64748b;
   --color-primary: #2563eb;
+  --color-primary-rgb: 37, 99, 235;
+  --color-primary-hover: #1d4ed8;
   --color-male: #2c8ea3;
   --color-female: #e08b2f;
   --color-other: #64748b;
+  --color-male-rgb: 44, 142, 163;
+  --color-female-rgb: 224, 139, 47;
+  --color-other-rgb: 100, 116, 139;
   --color-male-ring: #1c6577;
   --color-female-ring: #b8691f;
   --color-focus: #f5b301;
+  --color-focus-rgb: 245, 179, 1;
   --color-connector: #94a3b8;
   --color-alive: #16a34a;
   --color-deceased-bg: #e5e7eb;
@@ -19,18 +29,68 @@
   --color-father-tint-border: rgba(44, 142, 163, 0.45);
   --color-mother-tint: rgba(224, 139, 47, 0.14);
   --color-mother-tint-border: rgba(224, 139, 47, 0.45);
-  --radius: 10px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --color-highlight: #e0392b;
+  --color-highlight-rgb: 224, 57, 43;
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* Radius scale (--radius kept as an alias for existing component CSS) */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+  --radius: var(--radius-md);
+
+  /* Type scale */
+  --font-xs: 12px;
+  --font-sm: 13px;
+  --font-base: 14px;
+  --font-md: 15px;
+  --font-lg: 16px;
+  --font-xl: 20px;
+  --font-2xl: 24px;
+
+  /* Elevation scale (--shadow kept as an alias for existing component CSS) */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.06);
+  --shadow-xl: 0 24px 64px rgba(15, 23, 42, 0.18), 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow: var(--shadow-sm);
+
+  /* Glass surface tokens */
+  --glass-bg: rgba(255, 255, 255, 0.66);
+  --glass-bg-strong: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-blur: 20px;
+
+  /* Motion tokens */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
 }
 
 [data-theme='dark'] {
-  --color-bg: #0f172a;
+  --color-bg: #0b1220;
+  --color-bg-gradient:
+    radial-gradient(circle at 12% -10%, rgba(96, 165, 250, 0.12) 0%, transparent 42%),
+    radial-gradient(circle at 88% 108%, rgba(224, 139, 47, 0.08) 0%, transparent 40%),
+    var(--color-bg);
   --color-surface: #1e293b;
   --color-border: #334155;
   --color-text: #e2e8f0;
   --color-text-muted: #94a3b8;
   --color-primary: #60a5fa;
+  --color-primary-rgb: 96, 165, 250;
+  --color-primary-hover: #3b82f6;
   --color-connector: #475569;
   --color-deceased-bg: #1e2433;
   --color-deceased-border: #475569;
@@ -38,7 +98,18 @@
   --color-father-tint-border: rgba(96, 165, 250, 0.4);
   --color-mother-tint: rgba(224, 139, 47, 0.16);
   --color-mother-tint-border: rgba(224, 139, 47, 0.45);
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --color-highlight: #f87171;
+  --color-highlight-rgb: 248, 113, 113;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.55), 0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow: var(--shadow-sm);
+
+  --glass-bg: rgba(30, 41, 59, 0.58);
+  --glass-bg-strong: rgba(30, 41, 59, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.08);
 }
 
 * {
@@ -55,7 +126,34 @@ body,
 body {
   font-family: var(--font);
   color: var(--color-text);
-  background: var(--color-bg);
+  background: var(--color-bg-gradient);
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--duration-base) var(--ease), color var(--duration-base) var(--ease);
+}
+
+/* Visible keyboard-focus ring on every interactive element, app-wide */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Reusable translucent/blurred surface for headers, modals, floating panels */
+.glass-surface {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

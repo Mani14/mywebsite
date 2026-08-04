@@ -1,5 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowLeft, Check, GitBranch, HeartPulse, Link2, LogOut, Redo2, Undo2 } from 'lucide-react';
 import { useFamily } from './hooks/useFamily';
+import { useAuth } from './hooks/useAuth';
+import Login from './components/Login';
+import AttachYourself from './components/AttachYourself';
 import FamilyTree from './components/FamilyTree';
 import SearchBar from './components/SearchBar';
 import PersonDetail from './components/PersonDetail';
@@ -7,7 +12,10 @@ import PersonForm from './components/PersonForm';
 import BirthdayWidget from './components/BirthdayWidget';
 import ImportExport from './components/ImportExport';
 import ThemeToggle from './components/ThemeToggle';
-import { getPerson, getFullName } from './utils/familyUtils';
+import StatsBar from './components/StatsBar';
+import StatsPanel from './components/StatsPanel';
+import DataHealthCheck from './components/DataHealthCheck';
+import { getPerson, getFullName, getAncestorChain } from './utils/familyUtils';
 import './styles/App.css';
 
 // Maps a formState.mode to the `relation` PersonForm/getEligibleLinkCandidates use.
@@ -32,12 +40,22 @@ export default function App() {
     removeChild,
     replaceAll,
     exportData,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = useFamily();
+  const { user, signOut, gsiReady, clientId, meId, setMe } = useAuth();
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [selectedId, setSelectedId] = useState(null);
   const [focusId, setFocusId] = useState(null);
   const [viewMode, setViewMode] = useState('forest'); // 'forest' (everyone) | 'pedigree' (focus person's ancestors + descendants)
   const [formState, setFormState] = useState(null); // { mode: 'edit'|'addChild'|'addSpouse', personId }
+  const [highlightedChain, setHighlightedChain] = useState([]); // ordered ids from a person up to their root, or [] if none
+  const [showStatsPanel, setShowStatsPanel] = useState(false);
+  const [showHealthCheck, setShowHealthCheck] = useState(false);
+  const [showAttachWizard, setShowAttachWizard] = useState(false);
+  const treeRef = useRef(null);
 
   const toggleCollapse = useCallback((id) => {
     setCollapsed((prev) => {
@@ -84,6 +102,36 @@ export default function App() {
   const closeDetail = useCallback(() => setSelectedId(null), []);
   const closeForm = useCallback(() => setFormState(null), []);
 
+  const highlightedIds = useMemo(() => new Set(highlightedChain), [highlightedChain]);
+  const handleHighlightLineage = useCallback((id) => {
+    setHighlightedChain(getAncestorChain(persons, id));
+  }, [persons]);
+  const handleClearHighlight = useCallback(() => setHighlightedChain([]), []);
+
+  // Links a person as "me" and, if they're missing a photo/email, backfills those
+  // from the signed-in Google account — never overwrites data that's already there.
+  const handleSetMe = useCallback((personId) => {
+    setMe(personId);
+    if (!personId) return;
+    const existing = persons[personId];
+    const updates = {};
+    if (!existing?.photo && user?.picture) updates.photo = user.picture;
+    if (!existing?.email && user?.email) updates.email = user.email;
+    if (Object.keys(updates).length > 0) updatePerson(personId, updates);
+  }, [setMe, persons, user, updatePerson]);
+
+  // Backfills photo/email for people already linked as "me" before this sync existed —
+  // runs once per sign-in/data-load rather than only at the moment of linking.
+  useEffect(() => {
+    if (!meId || !user) return;
+    const existing = persons[meId];
+    if (!existing) return;
+    const updates = {};
+    if (!existing.photo && user.picture) updates.photo = user.picture;
+    if (!existing.email && user.email) updates.email = user.email;
+    if (Object.keys(updates).length > 0) updatePerson(meId, updates);
+  }, [meId, user, persons, updatePerson]);
+
   const handleFormSave = useCallback((data) => {
     if (!formState) return;
     if (formState.mode === 'edit') {
@@ -95,26 +143,30 @@ export default function App() {
     } else if (formState.mode === 'addChild') {
       const newId = addChild(formState.personId, data);
       handleSelect(newId);
+      if (formState.linkToMe) handleSetMe(newId);
     } else if (formState.mode === 'addSpouse') {
       const newId = addSpouse(formState.personId, data);
       updatePerson(formState.personId, { marriageDate: data.marriageDate });
       handleSelect(newId);
+      if (formState.linkToMe) handleSetMe(newId);
     } else if (formState.mode === 'addParent') {
       const newId = addParent(formState.personId, data);
       handleSelect(newId);
+      if (formState.linkToMe) handleSetMe(newId);
     } else if (formState.mode === 'fillPlaceholderParent') {
       updatePerson(formState.personId, { ...data, isPlaceholder: false });
       handleSelect(formState.personId);
     } else if (formState.mode === 'addSibling') {
       const newId = addSibling(formState.personId, data);
       handleSelect(newId);
+      if (formState.linkToMe) handleSetMe(newId);
     } else if (formState.mode === 'addFirst') {
       const newId = addPerson(data);
       setRoot(newId);
       handleSelect(newId);
     }
     closeForm();
-  }, [formState, persons, updatePerson, addChild, addSpouse, addParent, addSibling, addPerson, setRoot, handleSelect, closeForm]);
+  }, [formState, persons, updatePerson, addChild, addSpouse, addParent, addSibling, addPerson, setRoot, handleSelect, closeForm, handleSetMe]);
 
   // Opens the add-relative form directly from a tree node's quick-add menu.
   // `parentGender` ('father'|'mother') comes from the dedicated placeholder boxes
@@ -123,6 +175,28 @@ export default function App() {
   const handleQuickAdd = useCallback((personId, mode, parentGender) => {
     setFormState({ mode, personId, parentGender });
   }, []);
+
+  // "Attach Yourself" wizard: user picked an anchor relative + a relation to them
+  // (Child/Parent/Spouse/Sibling) — opens the normal add-relative form, prefilled
+  // with the signed-in Google account's name/photo/email, and flags it so
+  // handleFormSave auto-links the newly created person as "me" once saved.
+  const handleAttachYourself = useCallback((anchorId, mode) => {
+    const [firstName, ...rest] = (user?.name || '').trim().split(/\s+/);
+    setFormState({
+      mode,
+      personId: anchorId,
+      prefill: { firstName: firstName || '', lastName: rest.join(' '), photo: user?.picture || '', email: user?.email || '' },
+      linkToMe: true,
+    });
+    setShowAttachWizard(false);
+  }, [user]);
+
+  // "This is me" shortcut inside the wizard: the anchor the user searched for is
+  // already their own existing record, so just link it instead of creating a new person.
+  const handleMarkAnchorAsMe = useCallback((anchorId) => {
+    handleSetMe(anchorId);
+    setShowAttachWizard(false);
+  }, [handleSetMe]);
 
   // "Link Existing" tab: attaches an already-recorded person in the requested role
   // instead of creating a duplicate, then opens their details like a normal add would.
@@ -151,6 +225,26 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [formState, selectedId, closeForm, closeDetail]);
+
+  // Ctrl/Cmd+Z undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z redo — ignored while typing
+  // in any text input/textarea so it doesn't fight with native text-field undo.
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   const handleDelete = useCallback((id) => {
     if (!window.confirm('Delete this person? This cannot be undone.')) return;
@@ -216,25 +310,113 @@ export default function App() {
     removeChild(selected.id, childId);
   }, [selected, persons, removeChild]);
 
+  const handleExportImage = useCallback(() => {
+    treeRef.current?.exportImage();
+  }, []);
+  const handleExportPDF = useCallback(() => {
+    treeRef.current?.exportPDF();
+  }, []);
+
+  if (!user) return <Login gsiReady={gsiReady} clientId={clientId} />;
+
   return (
     <div className="app">
-      <header className="app-header">
+      <header className="app-header glass-surface">
         <h1>Family Tree</h1>
-        <SearchBar persons={persons} onSelect={handleSearchSelect} />
+        <SearchBar persons={persons} onSelect={handleSearchSelect} meId={meId} onSetMe={handleSetMe} />
         <div className="app-header-actions">
-          {saveState === 'saved' && <span className="app-save-indicator">Saved ✓</span>}
-          <button
-            type="button"
-            className="view-mode-toggle"
-            onClick={() => setViewMode((m) => (m === 'forest' ? 'pedigree' : 'forest'))}
-            title={viewMode === 'forest' ? 'Show ancestry + descendants for the focused person' : 'Show the full family forest'}
-          >
-            {viewMode === 'forest' ? 'Pedigree View' : 'Full Tree View'}
-          </button>
-          <ImportExport exportData={exportData} onImport={handleImport} />
+          <AnimatePresence>
+            {saveState === 'saved' && (
+              <motion.span
+                className="app-save-indicator"
+                initial={{ opacity: 0, x: 6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 6 }}
+                transition={{ duration: 0.18 }}
+              >
+                <Check size={14} /> Saved
+              </motion.span>
+            )}
+          </AnimatePresence>
+
+          <div className="app-header-group">
+            <button type="button" className="icon-btn" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">
+              <Undo2 size={17} />
+              <span className="btn-label">Undo</span>
+            </button>
+            <button type="button" className="icon-btn" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (Ctrl+Y)">
+              <Redo2 size={17} />
+              <span className="btn-label">Redo</span>
+            </button>
+          </div>
+
+          <div className="app-header-group">
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => setViewMode((m) => (m === 'forest' ? 'pedigree' : 'forest'))}
+              aria-label={viewMode === 'forest' ? 'Switch to Pedigree View' : 'Switch to Full Tree View'}
+              title={viewMode === 'forest' ? 'Show ancestry + descendants for the focused person' : 'Show the full family forest'}
+            >
+              <GitBranch size={17} />
+              <span className="btn-label">{viewMode === 'forest' ? 'Pedigree View' : 'Full Tree View'}</span>
+            </button>
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => setShowHealthCheck(true)}
+              aria-label="Data health check"
+              title="Check for data issues"
+            >
+              <HeartPulse size={17} />
+              <span className="btn-label">Data Health</span>
+            </button>
+          </div>
+
+          <ImportExport
+            exportData={exportData}
+            onImport={handleImport}
+            onExportImage={handleExportImage}
+            onExportPDF={handleExportPDF}
+          />
           <ThemeToggle />
+
+          <div className="app-header-group app-user">
+            {user.picture && (
+              <span className="app-user-avatar-wrap" title={user.name || user.email}>
+                <img className="app-user-avatar" src={user.picture} alt="" />
+              </span>
+            )}
+            {!meId && (
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => setShowAttachWizard(true)}
+                aria-label="Attach yourself to the family tree"
+                title="Link your account to yourself in the family tree"
+              >
+                <Link2 size={17} />
+                <span className="btn-label">Attach Yourself</span>
+              </button>
+            )}
+            <button type="button" className="icon-btn" onClick={signOut} aria-label="Sign out" title={`Sign out (${user.email})`}>
+              <LogOut size={17} />
+              <span className="btn-label">Sign Out</span>
+            </button>
+          </div>
         </div>
       </header>
+
+      {!meId && (
+        <div className="app-attach-banner glass-surface">
+          <span>
+            <Link2 size={15} /> You're signed in but not linked to anyone in the tree yet.
+          </span>
+          <button type="button" className="icon-btn" onClick={() => setShowAttachWizard(true)}>
+            Attach Yourself
+          </button>
+        </div>
+      )}
 
       {viewMode === 'pedigree' && (
         <div className="pedigree-breadcrumb">
@@ -243,7 +425,7 @@ export default function App() {
             className="pedigree-breadcrumb-back"
             onClick={() => setViewMode('forest')}
           >
-            ← Back to Full Tree
+            <ArrowLeft size={14} /> Back to Full Tree
           </button>
           {focusedPerson && (
             <span className="pedigree-breadcrumb-label">
@@ -254,15 +436,21 @@ export default function App() {
       )}
 
       <BirthdayWidget persons={persons} onSelect={handleSearchSelect} />
+      {Object.keys(persons).length > 0 && (
+        <StatsBar persons={persons} onOpenDetails={() => setShowStatsPanel(true)} />
+      )}
 
       <main className="app-main">
         {rootPersonId ? (
           <FamilyTree
+            ref={treeRef}
             persons={persons}
             rootId={focusId || rootPersonId}
             priorityId={rootPersonId}
             collapsed={collapsed}
             mode={viewMode}
+            highlightedIds={highlightedIds}
+            meId={meId}
             onSelect={handleSelect}
             onToggle={toggleCollapse}
             onQuickAdd={handleQuickAdd}
@@ -277,25 +465,51 @@ export default function App() {
           <p style={{ padding: 24 }}>Loading…</p>
         )}
 
-        {selected && !formState && (
-          <PersonDetail
-            person={selected}
-            persons={persons}
-            isRoot={isAlreadyRoot}
-            onClose={closeDetail}
-            onNavigate={handleSelect}
-            onEdit={() => setFormState({ mode: 'edit', personId: selected.id })}
-            onAddChild={() => setFormState({ mode: 'addChild', personId: selected.id })}
-            onAddSpouse={() => setFormState({ mode: 'addSpouse', personId: selected.id })}
-            onAddParent={() => setFormState({ mode: 'addParent', personId: selected.id })}
-            onDelete={() => handleDelete(selected.id)}
-            onSetRoot={handleSetAsRoot}
-            onUnlinkSpouse={handleUnlinkSpouse}
-            onUnlinkParent={handleUnlinkParent}
-            onUnlinkChild={handleUnlinkChild}
-          />
-        )}
+        <AnimatePresence>
+          {selected && !formState && (
+            <PersonDetail
+              key={selected.id}
+              person={selected}
+              persons={persons}
+              isRoot={isAlreadyRoot}
+              rootPersonId={rootPersonId}
+              isHighlighted={highlightedIds.has(selected.id)}
+              meId={meId}
+              onSetMe={handleSetMe}
+              onClose={closeDetail}
+              onNavigate={handleSelect}
+              onEdit={() => setFormState({ mode: 'edit', personId: selected.id })}
+              onAddChild={() => setFormState({ mode: 'addChild', personId: selected.id })}
+              onAddSpouse={() => setFormState({ mode: 'addSpouse', personId: selected.id })}
+              onAddParent={() => setFormState({ mode: 'addParent', personId: selected.id })}
+              onDelete={() => handleDelete(selected.id)}
+              onSetRoot={handleSetAsRoot}
+              onUnlinkSpouse={handleUnlinkSpouse}
+              onUnlinkParent={handleUnlinkParent}
+              onUnlinkChild={handleUnlinkChild}
+              onHighlightLineage={handleHighlightLineage}
+              onClearHighlight={handleClearHighlight}
+            />
+          )}
+        </AnimatePresence>
       </main>
+
+      <StatsPanel persons={persons} isOpen={showStatsPanel} onClose={() => setShowStatsPanel(false)} />
+      <DataHealthCheck
+        persons={persons}
+        onNavigate={handleSearchSelect}
+        isOpen={showHealthCheck}
+        onClose={() => setShowHealthCheck(false)}
+      />
+
+      {showAttachWizard && (
+        <AttachYourself
+          persons={persons}
+          onAttach={handleAttachYourself}
+          onMarkAsMe={handleMarkAnchorAsMe}
+          onCancel={() => setShowAttachWizard(false)}
+        />
+      )}
 
       {formState && formState.mode === 'edit' && (
         <PersonForm
@@ -309,7 +523,7 @@ export default function App() {
       {formState && formState.mode === 'addChild' && (
         <PersonForm
           title="Add Child"
-          initialPerson={{}}
+          initialPerson={formState.prefill || {}}
           showMarriageDate={false}
           persons={persons}
           personId={formState.personId}
@@ -322,7 +536,7 @@ export default function App() {
       {formState && formState.mode === 'addSpouse' && (
         <PersonForm
           title="Add Spouse"
-          initialPerson={{}}
+          initialPerson={formState.prefill || {}}
           showMarriageDate
           persons={persons}
           personId={formState.personId}
@@ -335,7 +549,10 @@ export default function App() {
       {formState && formState.mode === 'addParent' && (
         <PersonForm
           title={formState.parentGender === 'father' ? 'Add Father' : formState.parentGender === 'mother' ? 'Add Mother' : 'Add Parent'}
-          initialPerson={formState.parentGender ? { gender: formState.parentGender === 'father' ? 'male' : 'female' } : {}}
+          initialPerson={{
+            ...(formState.parentGender ? { gender: formState.parentGender === 'father' ? 'male' : 'female' } : {}),
+            ...(formState.prefill || {}),
+          }}
           showMarriageDate={false}
           persons={persons}
           personId={formState.personId}
@@ -357,7 +574,7 @@ export default function App() {
       {formState && formState.mode === 'addSibling' && (
         <PersonForm
           title="Add Sibling"
-          initialPerson={{}}
+          initialPerson={formState.prefill || {}}
           showMarriageDate={false}
           persons={persons}
           personId={formState.personId}
