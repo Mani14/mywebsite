@@ -10,7 +10,7 @@ import {
 
 // Card + spacing geometry (in world pixels).
 export const NODE_W = 132;
-export const NODE_H = 96;
+export const NODE_H = 116; // tall enough for a 2-line wrapped name below the avatar
 export const COUPLE_GAP = 20; // space between a person and their spouse
 export const H_GAP = 40; // horizontal gap between sibling subtrees
 export const V_GAP = 84; // vertical gap between generations
