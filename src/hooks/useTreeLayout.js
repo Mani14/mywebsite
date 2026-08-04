@@ -289,20 +289,23 @@ export function computeForestLayout(persons, rootIds, collapsed = new Set(), { e
   });
   out.width = Math.max(0, xOffset - TREE_GAP);
 
-  // A root that's an auto-created placeholder parent normally belongs one
-  // generation ABOVE its real children — but if one of its children was claimed
-  // by a different (earlier-processed) root, e.g. because that child already has
-  // their own spouse/root elsewhere, the placeholder's own batch has no fixed
-  // relationship to THAT root and, left alone, starts at row 0 like every other
-  // independent root instead of one row above where the child actually ended up.
-  // Detect that cross-linked case here and shift the placeholder's whole batch
-  // (itself plus any of its own unclaimed children, e.g. a sibling added at the
-  // same time) so it sits exactly one generation above the claimed child —
-  // dragging its own unclaimed children along keeps them correctly one row below
-  // the placeholder, and thus alongside their claimed sibling, same as before.
+  // Any root belongs one generation ABOVE its own children — but if one of its
+  // children was claimed by a different (earlier-processed) root, e.g. because
+  // that child already has their own spouse/root elsewhere (a married-in child
+  // whose spouse's own family is also being rendered), this root's own batch has
+  // no fixed relationship to THAT other batch and, left alone, starts at row 0
+  // like every other independent root instead of one row above where the child
+  // actually ended up. This misplaces the root at the SAME generation as that
+  // child (e.g. Kasi ending up level with his own daughter Vijayalakshmi) instead
+  // of one row above, and drags the root's own other, unclaimed children down a
+  // generation too. Detect that cross-linked case here and shift the root's whole
+  // batch (itself plus any of its own unclaimed children) so it sits exactly one
+  // generation above the claimed child — dragging its own unclaimed children
+  // along keeps them correctly one row below the root, and thus alongside their
+  // claimed sibling, same as before.
   batches.forEach((batch) => {
     const rootNode = batch.tree.nodes.find((n) => n.id === batch.rootId);
-    if (!rootNode || !rootNode.person?.isPlaceholder) return;
+    if (!rootNode) return;
     const link = batch.tree.crossLinks.find((l) => l.parentId === rootNode.id);
     if (!link) return;
     const childBatch = batches.find(
