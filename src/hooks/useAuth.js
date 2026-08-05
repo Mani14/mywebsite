@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut as fbSignOut } from 'firebase/auth';
+import { onAuthStateChanged, getRedirectResult, signInWithPopup, signInWithRedirect, signOut as fbSignOut } from 'firebase/auth';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
+
+// iOS Safari/Chrome (both WebKit) partition storage during the popup handshake
+// (Intelligent Tracking Prevention), which can make signInWithPopup silently fail
+// to persist the session. Redirect-based sign-in avoids the popup entirely.
+const isIOS = typeof navigator !== 'undefined' && /iP(hone|ad|od)/.test(navigator.userAgent);
 
 // Firebase-Auth (Google) gate for the app, plus the per-user "me" link stored in
 // Firestore (users/<uid>.meId) so your attachment follows you across devices.
@@ -11,6 +16,8 @@ export function useAuth() {
   const [meId, setMeId] = useState(null);
 
   useEffect(() => {
+    // Completes the sign-in started by signInWithRedirect (no-op if none pending).
+    getRedirectResult(auth).catch(() => {});
     return onAuthStateChanged(auth, (u) => {
       setUser(u ? { uid: u.uid, email: u.email, name: u.displayName, picture: u.photoURL } : null);
       if (!u) setMeId(null);
@@ -28,6 +35,7 @@ export function useAuth() {
 
   const signIn = useCallback(() => {
     googleProvider.setCustomParameters({ prompt: 'select_account' });
+    if (isIOS) return signInWithRedirect(auth, googleProvider);
     return signInWithPopup(auth, googleProvider).catch(() => {});
   }, []);
 

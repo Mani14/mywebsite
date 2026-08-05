@@ -183,8 +183,14 @@
   transition: transform var(--duration-base) var(--ease);
 }
 
-.mini-card:hover .avatar img {
-  transform: scale(1.06);
+/* Gated behind (hover: hover): ANY unguarded `:hover` rule matching the tapped
+   .mini-card button makes WebKit (iOS Safari/Chrome) require a first tap to enter
+   "hover" and a second tap to actually click — this was the last such rule, and the
+   real cause of the remaining mobile double-tap-to-select bug. */
+@media (hover: hover) {
+  .mini-card:hover .avatar img {
+    transform: scale(1.06);
+  }
 }
 
 .avatar-male {
@@ -314,11 +320,20 @@
     background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
 }
 
-.mini-card-wrap:hover .mini-card-add,
 .mini-card-wrap-focus .mini-card-add,
 .mini-card-wrap-menu-open .mini-card-add {
   opacity: 1;
   transform: scale(1);
+}
+
+/* Hover-reveal only on hover-capable devices — touch already reveals it via the
+   -focus/-menu-open classes above, so gating this avoids the WebKit tap-target
+   double-tap quirk on an ANCESTOR (.mini-card-wrap) of the tapped mini-card button. */
+@media (hover: hover) {
+  .mini-card-wrap:hover .mini-card-add {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Badge on anyone married in from another family, whose own parents/siblings render
@@ -362,15 +377,19 @@
   border-radius: 50%;
 }
 
-.mini-card-jump:hover {
-  transform: scale(1.15);
-  box-shadow: 0 0 0 2px var(--color-primary), var(--shadow-md);
-}
+/* Gated: these are themselves tappable buttons, so an ungated :hover would need
+   the same WebKit double-tap workaround as the main mini-card did. */
+@media (hover: hover) {
+  .mini-card-jump:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 2px var(--color-primary), var(--shadow-md);
+  }
 
-.mini-card-add:hover {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--color-primary) 70%, white 30%), var(--color-primary));
-  color: #fff;
-  border-color: var(--color-primary);
+  .mini-card-add:hover {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--color-primary) 70%, white 30%), var(--color-primary));
+    color: #fff;
+    border-color: var(--color-primary);
+  }
 }
 
 .mini-card-menu {
