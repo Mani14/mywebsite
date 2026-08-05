@@ -254,13 +254,15 @@
   cursor: pointer;
 }
 
-.parent-placeholder:hover .parent-placeholder-box {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
+@media (hover: hover) {
+  .parent-placeholder:hover .parent-placeholder-box {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
 
-.parent-placeholder:hover .parent-placeholder-label {
-  color: var(--color-primary);
+  .parent-placeholder:hover .parent-placeholder-label {
+    color: var(--color-primary);
+  }
 }
 
 .parent-placeholder-box {
@@ -482,11 +484,13 @@
     box-shadow var(--duration-fast) var(--ease);
 }
 
-.tree-controls button:hover {
-  background: var(--color-primary);
-  color: #fff;
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .tree-controls button:hover {
+    background: var(--color-primary);
+    color: #fff;
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
 }
 
 @media (max-width: 480px) {
