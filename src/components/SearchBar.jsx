@@ -1,19 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { BadgeCheck, Search } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { getFullName } from '../utils/familyUtils';
 import '../styles/SearchBar.css';
 
 const MAX_RESULTS = 8;
 
-export default function SearchBar({ persons, onLocate, onViewDetails, meId, onSetMe }) {
+export default function SearchBar({ persons, onLocate }) {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  // Distinguishes a single click (locate) from a double click (view details): the
-  // first click waits briefly to see if a second one lands before acting.
-  const clickTimerRef = useRef(null);
-
-  useEffect(() => () => clearTimeout(clickTimerRef.current), []);
 
   const matches = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -23,33 +18,18 @@ export default function SearchBar({ persons, onLocate, onViewDetails, meId, onSe
       .slice(0, MAX_RESULTS);
   }, [persons, query]);
 
-  const close = () => {
+  const select = (id) => {
+    onLocate(id);
     setQuery('');
     setIsOpen(false);
   };
 
-  const handleResultClick = (id) => {
-    if (clickTimerRef.current) return; // a double-click is in progress
-    clickTimerRef.current = setTimeout(() => {
-      clickTimerRef.current = null;
-      onLocate(id);
-      close();
-    }, 250);
-  };
-
-  const handleResultDoubleClick = (id) => {
-    clearTimeout(clickTimerRef.current);
-    clickTimerRef.current = null;
-    onViewDetails(id);
-    close();
-  };
-
   const handleKeyDown = (e) => {
     if (e.key === 'Escape') {
-      close();
+      setQuery('');
+      setIsOpen(false);
     } else if (e.key === 'Enter' && matches.length > 0) {
-      onViewDetails(matches[0].id);
-      close();
+      select(matches[0].id);
     }
   };
 
@@ -79,32 +59,22 @@ export default function SearchBar({ persons, onLocate, onViewDetails, meId, onSe
             transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
           >
             {matches.length > 0 ? (
-              matches.map((person) => {
-                const isMe = !!meId && meId === person.id;
-                return (
-                  <li key={person.id} className="search-bar-result-row">
-                    <button
-                      type="button"
-                      onClick={() => handleResultClick(person.id)}
-                      onDoubleClick={() => handleResultDoubleClick(person.id)}
-                      title="Click to locate · double-click for details"
-                    >
-                      {getFullName(person)}
-                    </button>
-                    {onSetMe && (
-                      <button
-                        type="button"
-                        className={`search-bar-mark-me${isMe ? ' is-me' : ''}`}
-                        title={isMe ? 'This is you' : 'Mark as Me'}
-                        aria-label={isMe ? `${getFullName(person)} is marked as you` : `Mark ${getFullName(person)} as you`}
-                        onClick={() => onSetMe(isMe ? null : person.id)}
-                      >
-                        <BadgeCheck size={14} />
-                      </button>
-                    )}
-                  </li>
-                );
-              })
+              matches.map((person) => (
+                <li key={person.id} className="search-bar-result-row">
+                  {/* onMouseDown (not onClick) fires before the input's blur closes the
+                      dropdown, so a tap always registers instead of occasionally missing. */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      select(person.id);
+                    }}
+                    title="Focus this person"
+                  >
+                    {getFullName(person)}
+                  </button>
+                </li>
+              ))
             ) : (
               <li className="search-bar-empty">No matches</li>
             )}

@@ -406,7 +406,7 @@ export default function App() {
         >
           <Menu size={17} />
         </button>
-        <SearchBar persons={persons} onLocate={handleLocatePerson} onViewDetails={handleViewPersonDetails} meId={meId} onSetMe={handleSetMe} />
+        <SearchBar persons={persons} onLocate={handleLocatePerson} />
         <div className="app-header-actions">
           <AnimatePresence>
             {saveState === 'saved' && (
