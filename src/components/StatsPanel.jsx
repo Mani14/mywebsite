@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { computeFamilyStats, getFullName } from '../utils/familyUtils';
+import { computeFamilyStats, getDaysUntilBirthday, getFullName } from '../utils/familyUtils';
 import Modal from './Modal';
 import '../styles/StatsPanel.css';
 
@@ -43,6 +43,12 @@ export default function StatsPanel({ persons, isOpen, onClose, onSelect }) {
       if (!generations.has(g)) generations.set(g, []);
       generations.get(g).push(p);
     }
+    const upcomingBirthdays = all
+      .filter((p) => p.isAlive)
+      .map((p) => ({ person: p, days: getDaysUntilBirthday(p.dob) }))
+      .filter((entry) => entry.days != null)
+      .sort((a, b) => a.days - b.days)
+      .slice(0, 10);
     return {
       total: all,
       alive: all.filter((p) => p.isAlive),
@@ -53,6 +59,7 @@ export default function StatsPanel({ persons, isOpen, onClose, onSelect }) {
       other: all.filter((p) => p.gender !== 'male' && p.gender !== 'female'),
       couples,
       generations,
+      upcomingBirthdays,
     };
   }, [persons]);
 
@@ -160,12 +167,15 @@ export default function StatsPanel({ persons, isOpen, onClose, onSelect }) {
 
         {renderDetail()}
 
-        {stats.topLastNames?.length > 0 && (
+        {lists.upcomingBirthdays.length > 0 && (
           <div className="stats-panel-section">
-            <h3>Top last names</h3>
+            <h3>Upcoming birthdays <span className="stats-panel-count">{lists.upcomingBirthdays.length} people</span></h3>
             <ul>
-              {stats.topLastNames.map(({ name, count }) => (
-                <li key={name}>{name} <span className="stats-panel-count">{count}</span></li>
+              {lists.upcomingBirthdays.map(({ person, days }) => (
+                <li key={person.id}>
+                  <button type="button" className="stats-panel-name" onClick={() => go(person.id)}>{getFullName(person)}</button>
+                  <span className="stats-panel-count">{days === 0 ? 'Today' : `${days}d`}</span>
+                </li>
               ))}
             </ul>
           </div>
