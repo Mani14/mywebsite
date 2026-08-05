@@ -91,10 +91,12 @@ export default function App() {
   // the panel never keeps showing a person other than the one now highlighted.
   // In Pedigree View, focus IS the diagram's root (see handleSelect above), so a
   // plain tap on anyone else must open their panel directly instead of re-rooting
-  // the whole diagram out from under whatever the user was just looking at.
+  // the whole diagram out from under whatever the user was just looking at. Since
+  // isFocus is only ever true for the root card, EVERY other card always routes
+  // here (never to handleSelect), so the toggle-close has to live here too.
   const handleFocusPerson = useCallback((id) => {
     if (viewMode === 'pedigree') {
-      setSelectedId(id);
+      setSelectedId((prev) => (prev === id ? null : id));
       return;
     }
     setFocusId(id);
