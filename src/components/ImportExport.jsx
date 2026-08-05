@@ -104,8 +104,9 @@ export default function ImportExport({ exportData, onImport, onExportImage, onEx
         <ChevronDown size={14} className={`import-export-chevron ${open ? 'is-open' : ''}`} />
       </button>
 
-      <AnimatePresence>
-        {open && menuPos && createPortal(
+      {createPortal(
+        <AnimatePresence>
+          {open && menuPos && (
           <motion.div
             ref={menuRef}
             className="import-export-menu glass-surface"
@@ -132,10 +133,11 @@ export default function ImportExport({ exportData, onImport, onExportImage, onEx
                 <FileText size={15} /> Export PDF
               </button>
             )}
-          </motion.div>,
-          document.body
-        )}
-      </AnimatePresence>
+          </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       <input
         ref={fileInputRef}

@@ -173,6 +173,7 @@ export default function PersonDetail({
       </div>
 
       <div className="detail-actions">
+        <button type="button" onClick={onEdit}><Pencil size={14} /> Edit</button>
         <button type="button" onClick={onAddChild}><Baby size={14} /> Add Child</button>
         {!spouse && (
           <button type="button" onClick={onAddSpouse}><HeartHandshake size={14} /> Add Spouse</button>
