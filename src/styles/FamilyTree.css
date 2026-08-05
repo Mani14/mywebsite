@@ -159,6 +159,13 @@
     0 0 18px 3px rgba(var(--color-highlight-rgb), 0.45);
 }
 
+/* The green "located" ring (search / Locate Me) — placed after focus + highlighted so a
+   located person reads green even while also focused or on a highlighted lineage. */
+.mini-card-located .avatar {
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 6px #22c55e,
+    0 0 20px 4px rgba(34, 197, 94, 0.5);
+}
+
 .avatar {
   --halo-rgb: var(--color-primary-rgb);
   width: 60px;

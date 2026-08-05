@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { getFullName } from '../utils/familyUtils';
 import '../styles/SearchBar.css';
 
@@ -9,6 +9,7 @@ const MAX_RESULTS = 8;
 export default function SearchBar({ persons, onLocate }) {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const inputRef = useRef(null);
 
   const matches = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -22,6 +23,8 @@ export default function SearchBar({ persons, onLocate }) {
     onLocate(id);
     setQuery('');
     setIsOpen(false);
+    // Drop focus so the mobile keyboard closes after choosing a result.
+    inputRef.current?.blur();
   };
 
   const handleKeyDown = (e) => {
@@ -37,6 +40,7 @@ export default function SearchBar({ persons, onLocate }) {
     <div className="search-bar">
       <Search size={14} className="search-bar-icon" />
       <input
+        ref={inputRef}
         type="text"
         className="search-bar-input"
         placeholder="Search by name…"

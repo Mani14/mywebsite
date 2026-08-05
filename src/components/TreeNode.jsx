@@ -19,7 +19,7 @@ const QUICK_ADD_OPTIONS = [
   { mode: 'addSibling', label: 'Add Sibling', show: () => true },
 ];
 
-function MiniCard({ person, isFocus, isHighlighted, isMe, hasSpouse, showJumpLink, onFocus, onSelect, onQuickAdd, onJumpTo }) {
+function MiniCard({ person, isFocus, isHighlighted, isLocated, isMe, hasSpouse, showJumpLink, onFocus, onSelect, onQuickAdd, onJumpTo }) {
   const genderClass = `avatar avatar-${person.gender}`;
   const deceased = !person.isAlive;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -52,7 +52,7 @@ function MiniCard({ person, isFocus, isHighlighted, isMe, hasSpouse, showJumpLin
     >
       <button
         type="button"
-        className={`mini-card${deceased ? ' mini-card-deceased' : ''}${isFocus ? ' mini-card-focus' : ''}${isHighlighted ? ' mini-card-highlighted' : ''}`}
+        className={`mini-card${deceased ? ' mini-card-deceased' : ''}${isFocus ? ' mini-card-focus' : ''}${isHighlighted ? ' mini-card-highlighted' : ''}${isLocated ? ' mini-card-located' : ''}`}
         style={{ width: NODE_W, height: NODE_H }}
         onClick={() => (isFocus ? onSelect(person.id) : onFocus(person.id))}
         title={getFullName(person)}
@@ -120,7 +120,7 @@ function MiniCard({ person, isFocus, isHighlighted, isMe, hasSpouse, showJumpLin
 }
 
 // A positioned node holding a person (and optional spouse) plus an expand toggle.
-export default function TreeNode({ node, index, focusId, renderedIds, side, highlightedIds, meId, onFocus, onSelect, onToggle, onQuickAdd, onJumpTo }) {
+export default function TreeNode({ node, index, focusId, renderedIds, side, highlightedIds, meId, locatedId, onFocus, onSelect, onToggle, onQuickAdd, onJumpTo }) {
   const { person, spouse, x, y, coupleWidth } = node;
   const left = x - coupleWidth / 2;
   const sideClass = side ? ` couple-side-${side}` : '';
@@ -179,6 +179,7 @@ export default function TreeNode({ node, index, focusId, renderedIds, side, high
           person={person}
           isFocus={person.id === focusId}
           isHighlighted={!!highlightedIds?.has(person.id)}
+          isLocated={person.id === locatedId}
           isMe={!!meId && person.id === meId}
           hasSpouse={!!spouse}
           onFocus={onFocus}
@@ -202,6 +203,7 @@ export default function TreeNode({ node, index, focusId, renderedIds, side, high
             person={spouse}
             isFocus={spouse.id === focusId}
             isHighlighted={!!highlightedIds?.has(spouse.id)}
+            isLocated={spouse.id === locatedId}
             isMe={!!meId && spouse.id === meId}
             hasSpouse
             // Anyone married in who has their own recorded parents has a family

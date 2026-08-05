@@ -69,7 +69,7 @@ async function shareOrDownloadFile(blob, filename, mimeType) {
 // front of the claim order, stealing a shared branch away from the real family and
 // making it vanish entirely once that tiny cluster gets excluded as a satellite.
 const FamilyTree = forwardRef(function FamilyTree(
-  { persons, rootId, priorityId, collapsed, mode = 'forest', highlightedIds, locateId, locateNonce, meId, onFocus, onSelect, onToggle, onQuickAdd, onJumpTo, onLocateNotFound },
+  { persons, rootId, priorityId, collapsed, mode = 'forest', highlightedIds, locateId, locateNonce, locatedId, meId, onFocus, onSelect, onToggle, onQuickAdd, onJumpTo, onLocateNotFound },
   exportRef
 ) {
   const rootIds = useMemo(
@@ -479,6 +479,7 @@ const FamilyTree = forwardRef(function FamilyTree(
               highlightedIds={highlightedIds}
               meId={meId}
               onFocus={onFocus}
+              locatedId={locatedId}
               onSelect={onSelect}
               onToggle={onToggle}
               onQuickAdd={onQuickAdd}

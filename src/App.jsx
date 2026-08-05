@@ -52,6 +52,7 @@ export default function App() {
   const [viewMode, setViewMode] = useState('forest'); // 'forest' (everyone) | 'pedigree' (focus person's ancestors + descendants)
   const [formState, setFormState] = useState(null); // { mode: 'edit'|'addChild'|'addSpouse', personId }
   const [highlightedChain, setHighlightedChain] = useState([]); // ordered ids from a person up to their root, or [] if none
+  const [locatedId, setLocatedId] = useState(null); // person shown with the green "located" ring (search / Locate Me)
   const [showStatsPanel, setShowStatsPanel] = useState(false);
   const [showAttachWizard, setShowAttachWizard] = useState(false);
   // A locate request { id, nonce }: the nonce bumps on every Locate so FamilyTree
@@ -116,7 +117,10 @@ export default function App() {
   const handleHighlightLineage = useCallback((id) => {
     setHighlightedChain(getAncestorChain(persons, id));
   }, [persons]);
-  const handleClearHighlight = useCallback(() => setHighlightedChain([]), []);
+  const handleClearHighlight = useCallback(() => {
+    setHighlightedChain([]);
+    setLocatedId(null);
+  }, []);
 
   // Links a person as "me" and, if they're missing a photo/email, backfills those
   // from the signed-in Google account — never overwrites data that's already there.
@@ -305,7 +309,7 @@ export default function App() {
   const handleLocatePerson = useCallback((id) => {
     revealAncestors(id);
     setFocusId(id);
-    setHighlightedChain([id]);
+    setLocatedId(id);
     setLocateRequest((prev) => ({ id, nonce: prev.nonce + 1 }));
   }, [revealAncestors]);
 
@@ -541,6 +545,7 @@ export default function App() {
             highlightedIds={highlightedIds}
             locateId={locateRequest.id}
             locateNonce={locateRequest.nonce}
+            locatedId={locatedId}
             meId={meId}
             onFocus={handleFocusPerson}
             onSelect={handleSelect}
