@@ -93,8 +93,14 @@
   text-align: center;
 }
 
-.mini-card:hover .avatar {
-  box-shadow: var(--shadow-lg), 0 0 20px 2px rgba(var(--color-primary-rgb), 0.3);
+/* Hover shows the same yellow ring as focus/click — but only on hover-capable
+   (desktop) devices. On touch there's no hover, so a single tap goes straight to
+   focus instead of the first tap being swallowed as a hover. */
+@media (hover: hover) {
+  .mini-card:hover .avatar {
+    box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 6px var(--color-focus, #f5b301),
+      0 0 20px 4px rgba(var(--color-focus-rgb), 0.5);
+  }
 }
 
 .mini-card-avatar-wrap {
@@ -110,24 +116,6 @@
   background: var(--color-primary);
   border-radius: 50%;
   box-shadow: 0 0 0 2px var(--color-surface);
-}
-
-.mini-card:hover .avatar-male {
-  box-shadow: var(--shadow-lg), 0 0 22px 4px rgba(var(--color-male-rgb), 0.4);
-}
-
-.mini-card:hover .avatar-female {
-  box-shadow: var(--shadow-lg), 0 0 22px 4px rgba(var(--color-female-rgb), 0.4);
-}
-
-.mini-card:hover .avatar-other {
-  box-shadow: var(--shadow-lg), 0 0 22px 4px rgba(var(--color-other-rgb), 0.4);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .mini-card:hover .avatar {
-    animation: avatar-glow-pulse 1.6s var(--ease) infinite;
-  }
 }
 
 @keyframes avatar-glow-pulse {

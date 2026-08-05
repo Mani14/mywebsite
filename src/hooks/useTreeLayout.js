@@ -388,6 +388,25 @@ export function useForestLayout(persons, rootIds, collapsed) {
 // Centring the focus person on screen is handled entirely by FamilyTree's own
 // pan/centre logic (it already searches the returned nodes for `rootId`), so no
 // coordinate shifting is needed here.
+// For a top-of-lineage couple (neither spouse has recorded parents) both members are
+// equally valid roots, so whichever one is clicked would otherwise flip the couple's
+// left/right order. Pick a STABLE representative — a shared child's first (blood)
+// parent, else the male, else the lexically-smaller id — so the couple never swaps.
+function canonicalTopRoot(persons, id) {
+  const person = persons[id];
+  const spouse = person?.spouseId ? persons[person.spouseId] : null;
+  if (!person || !spouse) return id;
+  if ((person.parentIds?.length || 0) > 0 || (spouse.parentIds?.length || 0) > 0) return id;
+  for (const cid of person.childrenIds || []) {
+    const first = persons[cid]?.parentIds?.[0];
+    if (first === id) return id;
+    if (first === spouse.id) return spouse.id;
+  }
+  if (person.gender === 'male' && spouse.gender !== 'male') return id;
+  if (spouse.gender === 'male' && person.gender !== 'male') return spouse.id;
+  return id <= spouse.id ? id : spouse.id;
+}
+
 export function computePedigreeLayout(persons, personId, collapsed = new Set()) {
   const person = persons[personId];
   if (!person) return { nodes: [], links: [], crossLinks: [], maxDepth: 0, width: 0, height: 0 };
@@ -400,9 +419,9 @@ export function computePedigreeLayout(persons, personId, collapsed = new Set()) 
   } else if (fatherRoot || motherRoot) {
     rootIds = [fatherRoot || motherRoot];
   } else {
-    // No recorded parents (the focus person is themself the top of a lineage) —
-    // just show their own full family tree, nothing to split left/right.
-    rootIds = [primaryLineageRoot(persons, personId)];
+    // No recorded parents (the focus person is themself the top of a lineage) — root
+    // on a stable couple representative so clicking either spouse never swaps them.
+    rootIds = [canonicalTopRoot(persons, primaryLineageRoot(persons, personId))];
   }
 
   return computeForestLayout(persons, rootIds, collapsed, { excludeSatellites: false });
