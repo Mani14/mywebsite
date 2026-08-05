@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { useForestLayout, usePedigreeLayout } from '../hooks/useTreeLayout';
+import { NODE_H, useForestLayout, usePedigreeLayout } from '../hooks/useTreeLayout';
 import { getForestRoots, getLineageRootIds } from '../utils/familyUtils';
 import ConnectorLines from './ConnectorLines';
 import MiniMap from './MiniMap';
@@ -8,6 +8,54 @@ import '../styles/FamilyTree.css';
 
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 2;
+
+// `.tree-world` has no intrinsic size of its own (all its children are absolutely
+// positioned) and normally sits pan/zoom-transformed inside a clipped, viewport-sized
+// `.tree-canvas` — capturing it directly would only grab whatever's currently
+// scrolled into view. This resets the transform to identity for the capture so
+// html2canvas renders the whole tree at natural scale, then restores it after.
+async function captureFullTree(html2canvas, worldEl, backgroundColor) {
+  const prevTransform = worldEl.style.transform;
+  const prevTransition = worldEl.style.transition;
+  worldEl.style.transition = 'none';
+  worldEl.style.transform = 'none';
+  try {
+    return await html2canvas(worldEl, { backgroundColor, useCORS: true });
+  } finally {
+    worldEl.style.transform = prevTransform;
+    worldEl.style.transition = prevTransition;
+  }
+}
+
+// Shares a file via the native Share Sheet when available — the reliable way to save
+// on iOS Safari, which doesn't support the anchor `download` attribute for data/blob
+// URLs — falling back to an in-DOM anchor-click download (desktop browsers) otherwise.
+async function shareOrDownloadFile(blob, filename, mimeType) {
+  const file = new File([blob], filename, { type: mimeType });
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      // Sharing failed for another reason — fall through to the download link below.
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Safari (desktop and iOS) ignores the `download` attribute for blob URLs and
+  // silently does nothing instead of downloading — open the file in a new tab so the
+  // user can save it manually (long-press > Save Image, or the PDF viewer's own
+  // share/save button).
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  if (isSafari) window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
 
 // Renders either every family in the dataset side by side (mode="forest", not just
 // the one connected to the focus person) or one person's ancestors-above +
@@ -74,6 +122,7 @@ const FamilyTree = forwardRef(function FamilyTree(
   );
 
   const containerRef = useRef(null);
+  const worldRef = useRef(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 40 });
   const drag = useRef(null);
@@ -351,20 +400,29 @@ const FamilyTree = forwardRef(function FamilyTree(
   // large trees can be enormous once fully unrolled.
   useImperativeHandle(exportRef, () => ({
     async exportImage() {
-      const { default: html2canvas } = await import('html2canvas');
-      const canvas = await html2canvas(containerRef.current, { backgroundColor: null });
-      const link = document.createElement('a');
-      link.download = 'family-tree.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      try {
+        const { default: html2canvas } = await import('html2canvas');
+        const canvas = await captureFullTree(html2canvas, worldRef.current, null);
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error('Could not render the tree to an image.');
+        await shareOrDownloadFile(blob, 'family-tree.png', 'image/png');
+      } catch (err) {
+        console.error('Export Image failed:', err);
+        window.alert(`Export Image failed: ${err?.message || err}`);
+      }
     },
     async exportPDF() {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
-      const canvas = await html2canvas(containerRef.current, { backgroundColor: '#ffffff' });
-      const orientation = canvas.width >= canvas.height ? 'landscape' : 'portrait';
-      const pdf = new jsPDF({ orientation, unit: 'px', format: [canvas.width, canvas.height] });
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save('family-tree.pdf');
+      try {
+        const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
+        const canvas = await captureFullTree(html2canvas, worldRef.current, '#ffffff');
+        const orientation = canvas.width >= canvas.height ? 'landscape' : 'portrait';
+        const pdf = new jsPDF({ orientation, unit: 'px', format: [canvas.width, canvas.height] });
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+        await shareOrDownloadFile(pdf.output('blob'), 'family-tree.pdf', 'application/pdf');
+      } catch (err) {
+        console.error('Export PDF failed:', err);
+        window.alert(`Export PDF failed: ${err?.message || err}`);
+      }
     },
   }));
 
@@ -381,8 +439,11 @@ const FamilyTree = forwardRef(function FamilyTree(
         onClickCapture={suppressClick}
       >
         <div
+          ref={worldRef}
           className="tree-world"
           style={{
+            width: Math.max(layout.width, 1),
+            height: Math.max(layout.height + NODE_H, 1),
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transition: isDragging || isWheeling ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}

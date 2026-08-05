@@ -31,6 +31,14 @@
   --color-mother-tint-border: rgba(224, 139, 47, 0.45);
   --color-highlight: #e0392b;
   --color-highlight-rgb: 224, 57, 43;
+  /* Pre-computed color-mix() results (static, not derived at runtime) — html2canvas's
+     CSS parser (used for Export Image/PDF) can't read the `color(srgb ...)` form that
+     color-mix() resolves to via getComputedStyle, so small UI accents that used it
+     silently broke every export. Keep these in sync by hand if the source colors above
+     change. */
+  --color-surface-primary-tint: #dee8fc; /* color-mix(in srgb, --color-surface 85%, --color-primary 15%) */
+  --color-primary-white-tint: #7ca1f3; /* color-mix(in srgb, --color-primary 60%, white 40%) */
+  --color-surface-text-tint: rgba(236, 237, 238, 0.93); /* color-mix(in srgb, --color-surface 85%, --color-text 8%) */
   --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
   /* Spacing scale */
@@ -100,6 +108,9 @@
   --color-mother-tint-border: rgba(224, 139, 47, 0.45);
   --color-highlight: #f87171;
   --color-highlight-rgb: 248, 113, 113;
+  --color-surface-primary-tint: #283c58;
+  --color-primary-white-tint: #a0c9fc;
+  --color-surface-text-tint: rgba(47, 57, 75, 0.93);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);

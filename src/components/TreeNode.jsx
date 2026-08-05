@@ -59,7 +59,7 @@ function MiniCard({ person, isFocus, isHighlighted, isMe, hasSpouse, showJumpLin
       >
         <motion.span className="mini-card-avatar-wrap" tabIndex={-1} {...avatarSpring}>
           <span className={genderClass}>
-            {person.photo ? <img src={person.photo} alt="" /> : getInitials(person)}
+            {person.photo ? <img src={person.photo} alt="" crossOrigin="anonymous" /> : getInitials(person)}
           </span>
           {isMe && <BadgeCheck className="mini-card-me-badge" size={16} />}
         </motion.span>

@@ -27,6 +27,17 @@
   color: transparent;
 }
 
+.app-header-count {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--color-text-muted, var(--color-text));
+  white-space: nowrap;
+}
+
+.app-stats-trigger {
+  padding: 7px;
+}
+
 .app-header-actions {
   margin-left: auto;
   display: flex;
@@ -103,22 +114,32 @@
   object-fit: cover;
 }
 
-.app-attach-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 8px 16px 0;
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-size: 0.88rem;
-}
-
-.app-attach-banner span {
+.app-attach-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  width: fit-content;
+  margin: 8px 16px 0;
+  padding: 6px 8px 6px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 0.82rem;
   color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.app-attach-pill button {
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-primary);
+  cursor: pointer;
+}
+
+.app-attach-pill button:hover {
+  filter: brightness(1.08);
 }
 
 .pedigree-breadcrumb {
@@ -270,8 +291,7 @@
     white-space: nowrap;
   }
 
-  .app-attach-banner {
-    flex-wrap: wrap;
-    row-gap: 6px;
+  .app-attach-pill span {
+    display: none;
   }
 }

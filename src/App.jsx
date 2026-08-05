@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, GitBranch, HeartPulse, Link2, LogOut, Redo2, Undo2 } from 'lucide-react';
+import { ArrowLeft, Check, GitBranch, Link2, LogOut, Menu, Redo2, Undo2 } from 'lucide-react';
 import { useFamily } from './hooks/useFamily';
 import { useAuth } from './hooks/useAuth';
 import Login from './components/Login';
@@ -12,9 +12,7 @@ import PersonForm from './components/PersonForm';
 import BirthdayWidget from './components/BirthdayWidget';
 import ImportExport from './components/ImportExport';
 import ThemeToggle from './components/ThemeToggle';
-import StatsBar from './components/StatsBar';
 import StatsPanel from './components/StatsPanel';
-import DataHealthCheck from './components/DataHealthCheck';
 import { getPerson, getFullName, getAncestorChain } from './utils/familyUtils';
 import './styles/App.css';
 
@@ -53,7 +51,6 @@ export default function App() {
   const [formState, setFormState] = useState(null); // { mode: 'edit'|'addChild'|'addSpouse', personId }
   const [highlightedChain, setHighlightedChain] = useState([]); // ordered ids from a person up to their root, or [] if none
   const [showStatsPanel, setShowStatsPanel] = useState(false);
-  const [showHealthCheck, setShowHealthCheck] = useState(false);
   const [showAttachWizard, setShowAttachWizard] = useState(false);
   const treeRef = useRef(null);
 
@@ -334,6 +331,18 @@ export default function App() {
     <div className="app">
       <header className="app-header glass-surface">
         <h1>Family Tree</h1>
+        {Object.keys(persons).length > 0 && (
+          <span className="app-header-count">{Object.keys(persons).length} members</span>
+        )}
+        <button
+          type="button"
+          className="icon-btn app-stats-trigger"
+          onClick={() => setShowStatsPanel(true)}
+          aria-label="Family statistics"
+          title="Full Stats"
+        >
+          <Menu size={17} />
+        </button>
         <SearchBar persons={persons} onSelect={handleSearchSelect} meId={meId} onSetMe={handleSetMe} />
         <div className="app-header-actions">
           <AnimatePresence>
@@ -372,16 +381,6 @@ export default function App() {
               <GitBranch size={17} />
               <span className="btn-label">{viewMode === 'forest' ? 'Pedigree View' : 'Full Tree View'}</span>
             </button>
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={() => setShowHealthCheck(true)}
-              aria-label="Data health check"
-              title="Check for data issues"
-            >
-              <HeartPulse size={17} />
-              <span className="btn-label">Data Health</span>
-            </button>
           </div>
 
           <ImportExport
@@ -419,12 +418,11 @@ export default function App() {
       </header>
 
       {!meId && (
-        <div className="app-attach-banner glass-surface">
-          <span>
-            <Link2 size={15} /> You're signed in but not linked to anyone in the tree yet.
-          </span>
-          <button type="button" className="icon-btn" onClick={() => setShowAttachWizard(true)}>
-            Attach Yourself
+        <div className="app-attach-pill glass-surface">
+          <Link2 size={14} />
+          <span>Not linked yet</span>
+          <button type="button" onClick={() => setShowAttachWizard(true)}>
+            Attach
           </button>
         </div>
       )}
@@ -447,9 +445,6 @@ export default function App() {
       )}
 
       <BirthdayWidget persons={persons} onSelect={handleSearchSelect} />
-      {Object.keys(persons).length > 0 && (
-        <StatsBar persons={persons} onOpenDetails={() => setShowStatsPanel(true)} />
-      )}
 
       <main className="app-main">
         {rootPersonId ? (
@@ -506,12 +501,6 @@ export default function App() {
       </main>
 
       <StatsPanel persons={persons} isOpen={showStatsPanel} onClose={() => setShowStatsPanel(false)} />
-      <DataHealthCheck
-        persons={persons}
-        onNavigate={handleSearchSelect}
-        isOpen={showHealthCheck}
-        onClose={() => setShowHealthCheck(false)}
-      />
 
       {showAttachWizard && (
         <AttachYourself
