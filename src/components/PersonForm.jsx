@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Camera } from 'lucide-react';
 import { getEligibleLinkCandidates, getFullName } from '../utils/familyUtils';
 import Modal from './Modal';
 import '../styles/PersonForm.css';
@@ -116,95 +117,116 @@ export default function PersonForm({
           </div>
         ) : (
         <>
-        <div className="person-form-row">
-          <label>
-            First name*
-            <input value={form.firstName} onChange={(e) => setField('firstName', e.target.value)} />
-          </label>
-          <label>
-            Last name*
-            <input value={form.lastName} onChange={(e) => setField('lastName', e.target.value)} />
-          </label>
+        <div className="person-form-photo-section">
+          <div className="person-form-photo-circle">
+            {form.photo ? (
+              <img src={form.photo} alt="" />
+            ) : (
+              <span className="person-form-photo-placeholder">
+                {(form.firstName[0] || '') + (form.lastName[0] || '') || '?'}
+              </span>
+            )}
+            <label className="person-form-photo-edit" title="Change photo">
+              <Camera size={13} />
+              <input type="file" accept="image/*" onChange={handlePhotoChange} />
+            </label>
+          </div>
+          {form.photo && (
+            <button type="button" className="person-form-photo-remove" onClick={() => setField('photo', '')}>
+              Remove photo
+            </button>
+          )}
         </div>
 
-        <div className="person-form-row">
-          <label>
-            Gender
-            <select value={form.gender} onChange={(e) => setField('gender', e.target.value)}>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-          {showMarriageDate && (
+        <div className="person-form-section">
+          <span className="person-form-section-title">Basic info</span>
+          <div className="person-form-row">
             <label>
-              Marriage date (optional)
+              First name*
+              <input value={form.firstName} onChange={(e) => setField('firstName', e.target.value)} />
+            </label>
+            <label>
+              Last name*
+              <input value={form.lastName} onChange={(e) => setField('lastName', e.target.value)} />
+            </label>
+          </div>
+
+          <div className="person-form-row">
+            <label>
+              Gender
+              <select value={form.gender} onChange={(e) => setField('gender', e.target.value)}>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            {showMarriageDate && (
+              <label>
+                Marriage date (optional)
+                <input
+                  type="date"
+                  value={form.marriageDate}
+                  onChange={(e) => setField('marriageDate', e.target.value)}
+                />
+              </label>
+            )}
+          </div>
+
+          <div className="person-form-row">
+            <label>
+              Date of birth (optional)
+              <input type="date" value={form.dob} onChange={(e) => setField('dob', e.target.value)} />
+            </label>
+            <label className="person-form-toggle">
               <input
-                type="date"
-                value={form.marriageDate}
-                onChange={(e) => setField('marriageDate', e.target.value)}
+                type="checkbox"
+                checked={!form.isAlive}
+                onChange={(e) => setField('isAlive', !e.target.checked)}
               />
+              <span className="person-form-toggle-track"><span className="person-form-toggle-thumb" /></span>
+              Deceased
+            </label>
+          </div>
+
+          {!form.isAlive && (
+            <label>
+              Date of death (optional)
+              <input type="date" value={form.dod} onChange={(e) => setField('dod', e.target.value)} />
             </label>
           )}
         </div>
 
-        <div className="person-form-row">
-          <label>
-            Date of birth (optional)
-            <input type="date" value={form.dob} onChange={(e) => setField('dob', e.target.value)} />
-          </label>
-          <label className="person-form-checkbox">
-            <input
-              type="checkbox"
-              checked={!form.isAlive}
-              onChange={(e) => setField('isAlive', !e.target.checked)}
-            />
-            Deceased
-          </label>
-        </div>
-
-        {!form.isAlive && (
-          <label>
-            Date of death (optional)
-            <input type="date" value={form.dod} onChange={(e) => setField('dod', e.target.value)} />
-          </label>
-        )}
-
-        <div className="person-form-row">
-          <label>
-            Work (optional)
-            <input value={form.work} onChange={(e) => setField('work', e.target.value)} />
-          </label>
-          <label>
-            Location (optional)
-            <input value={form.location} onChange={(e) => setField('location', e.target.value)} />
-          </label>
-          <label>
-            Phone (optional)
-            <input value={form.phone} onChange={(e) => setField('phone', e.target.value)} />
-          </label>
-        </div>
-
-        <label>
-          Email (optional)
-          <input type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} />
-        </label>
-
-        <label>
-          Photo (optional)
-          <input type="file" accept="image/*" onChange={handlePhotoChange} />
-        </label>
-        {form.photo && (
-          <div className="person-form-photo-preview">
-            <img src={form.photo} alt="Preview" />
-            <button type="button" onClick={() => setField('photo', '')}>Remove photo</button>
+        <div className="person-form-section">
+          <span className="person-form-section-title">Contact</span>
+          <div className="person-form-row">
+            <label>
+              Work (optional)
+              <input value={form.work} onChange={(e) => setField('work', e.target.value)} />
+            </label>
+            <label>
+              Location (optional)
+              <input value={form.location} onChange={(e) => setField('location', e.target.value)} />
+            </label>
           </div>
-        )}
+          <div className="person-form-row">
+            <label>
+              Phone (optional)
+              <input value={form.phone} onChange={(e) => setField('phone', e.target.value)} />
+            </label>
+            <label>
+              Email (optional)
+              <input type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} />
+            </label>
+          </div>
+        </div>
 
-        <label>
-          Notes / Bio (optional)
-          <textarea rows={3} value={form.notes} onChange={(e) => setField('notes', e.target.value)} />
-        </label>
+        <div className="person-form-section">
+          <span className="person-form-section-title">About</span>
+          <label>
+            Notes / Bio (optional)
+            <textarea rows={3} value={form.notes} onChange={(e) => setField('notes', e.target.value)} />
+          </label>
+        </div>
 
         <div className="person-form-actions">
           <button type="button" onClick={onCancel}>Cancel</button>

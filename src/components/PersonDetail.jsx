@@ -97,10 +97,15 @@ export default function PersonDetail({
           {person.photo ? <img src={person.photo} alt="" /> : getInitials(person)}
         </span>
         <div>
-          <h2 className="detail-name">
-            {!person.isAlive && <span className="dagger">†</span>}
-            {getFullName(person)}
-          </h2>
+          <div className="detail-name-row">
+            <h2 className="detail-name">
+              {!person.isAlive && <span className="dagger">†</span>}
+              {getFullName(person)}
+            </h2>
+            <button type="button" className="detail-edit-btn" onClick={onEdit} title="Edit" aria-label="Edit">
+              <Pencil size={13} />
+            </button>
+          </div>
           {!person.isAlive && <span className="detail-badge">Passed Away</span>}
           {relationshipLabel && (
             <span className="detail-badge detail-badge-relation">{relationshipLabel}</span>
@@ -168,7 +173,6 @@ export default function PersonDetail({
       </div>
 
       <div className="detail-actions">
-        <button type="button" onClick={onEdit}><Pencil size={14} /> Edit</button>
         <button type="button" onClick={onAddChild}><Baby size={14} /> Add Child</button>
         {!spouse && (
           <button type="button" onClick={onAddSpouse}><HeartHandshake size={14} /> Add Spouse</button>

@@ -1,7 +1,7 @@
 .person-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .person-form h2 {
@@ -11,33 +11,50 @@
 
 .person-form-error {
   margin: 0;
-  padding: 6px 10px;
+  padding: 8px 12px;
   font-size: 13px;
-  border-radius: 6px;
-  background: #fee2e2;
-  color: #b91c1c;
+  border-radius: var(--radius-sm);
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.25);
 }
 
 .person-form label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
   color: var(--color-text-muted);
 }
 
 .person-form input[type='text'],
 .person-form input[type='date'],
+.person-form input[type='email'],
 .person-form input,
 .person-form select,
 .person-form textarea {
-  padding: 6px 8px;
+  padding: 9px 12px;
   font-size: 14px;
+  font-weight: 400;
   color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
+  background: var(--color-bg);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-family: inherit;
+  transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.person-form input:focus,
+.person-form select:focus,
+.person-form textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.16);
+}
+
+.person-form textarea {
+  resize: vertical;
 }
 
 .person-form-row {
@@ -47,83 +64,229 @@
 
 .person-form-row label {
   flex: 1;
+  min-width: 0;
 }
 
-.person-form-checkbox {
+/* A styled toggle switch driven by a real (visually-hidden) checkbox, so it stays
+   keyboard/screen-reader accessible while looking like a modern iOS-style switch. */
+.person-form-toggle {
   flex-direction: row;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   justify-content: flex-start;
   margin-top: 20px;
+  cursor: pointer;
 }
 
-.person-form-photo-preview {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.person-form-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
 }
 
-.person-form-photo-preview img {
-  width: 48px;
-  height: 48px;
+.person-form-toggle-track {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-border);
+  transition: background var(--duration-fast) var(--ease);
+}
+
+.person-form-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.person-form-toggle input:checked + .person-form-toggle-track {
+  background: var(--color-primary);
+}
+
+.person-form-toggle input:checked + .person-form-toggle-track .person-form-toggle-thumb {
+  transform: translateX(14px);
+}
+
+.person-form-toggle input:focus-visible + .person-form-toggle-track {
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.3);
+}
+
+/* Grouped fields under a small uppercase label, like a modern settings/profile form. */
+.person-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.person-form-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.person-form-photo-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 2px;
+}
+
+.person-form-photo-circle {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 3px solid var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.person-form-photo-circle img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
 }
 
-.person-form-photo-preview button {
+.person-form-photo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  text-transform: uppercase;
+}
+
+/* Small camera badge overlapping the avatar's edge — sized just big enough to tap,
+   not sprawling across the avatar itself (see the mini-card-jump hit-zone rule). */
+.person-form-photo-edit {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  border: 2px solid var(--color-surface);
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+@media (hover: hover) {
+  .person-form-photo-edit:hover {
+    transform: scale(1.08);
+  }
+}
+
+.person-form-photo-edit input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.person-form-photo-remove {
   font-size: 12px;
+  font-weight: 600;
   border: none;
   background: transparent;
   color: var(--color-primary);
   cursor: pointer;
+  padding: 2px 4px;
 }
 
 .person-form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
 }
 
 .person-form-actions button {
-  padding: 6px 14px;
-  font-size: 13px;
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 600;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface);
-  color: var(--color-text);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
   cursor: pointer;
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease),
+    transform var(--duration-fast) var(--ease);
+}
+
+@media (hover: hover) {
+  .person-form-actions button:hover {
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
 }
 
 .person-form-save {
   background: var(--color-primary) !important;
   border-color: var(--color-primary) !important;
   color: #fff !important;
+  box-shadow: var(--shadow-sm);
+}
+
+@media (hover: hover) {
+  .person-form-save:hover {
+    background: var(--color-primary-hover) !important;
+    transform: translateY(-1px);
+  }
 }
 
 .person-form-tabs {
   display: flex;
-  gap: 10px;
+  gap: 4px;
+  padding: 4px;
   margin-bottom: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
 }
 
 .person-form-tabs button {
   flex: 1;
-  padding: 10px 12px;
-  font-size: 15px;
-  font-weight: 500;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: #fff;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
 }
 
 .person-form-tabs button.active {
   background: var(--color-primary);
-  border-color: var(--color-primary);
   color: #fff;
   font-weight: 600;
+  box-shadow: var(--shadow-sm);
 }
 
 .person-form-link {
@@ -138,15 +301,15 @@
   padding: 0;
   max-height: 260px;
   overflow-y: auto;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
 }
 
 .person-form-link-results li {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 10px 12px;
   font-size: 14px;
   color: var(--color-text);
   border-bottom: 1px solid var(--color-border);
@@ -163,10 +326,11 @@
 }
 
 .person-form-link-results button {
-  padding: 4px 10px;
+  padding: 5px 12px;
   font-size: 12px;
-  border: 1px solid var(--color-primary);
-  border-radius: 6px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-pill);
   background: var(--color-primary);
   color: #fff;
   cursor: pointer;
@@ -180,7 +344,7 @@
     gap: 12px;
   }
 
-  .person-form-checkbox {
+  .person-form-toggle {
     margin-top: 4px;
   }
 

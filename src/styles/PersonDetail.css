@@ -40,6 +40,35 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
+  padding-right: 30px;
+}
+
+.detail-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+}
+
+@media (hover: hover) {
+  .detail-edit-btn:hover {
+    background: var(--color-surface);
+    color: var(--color-primary);
+  }
 }
 
 .detail-avatar {
