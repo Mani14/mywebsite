@@ -36,7 +36,7 @@ export default function AttachYourself({ persons, onAttach, onMarkAsMe, onCancel
   const options = anchor ? RELATION_OPTIONS.filter((opt) => opt.show(anchor)) : [];
 
   return (
-    <Modal isOpen onClose={onCancel} title="Attach Yourself to the Tree" width={420} className="attach-yourself-modal">
+    <Modal isOpen onClose={onCancel} title="Add Yourself to the Tree" width={420} className="attach-yourself-modal">
       {!anchor ? (
         <div className="attach-step">
           <p className="attach-step-hint">Search for a relative already in the tree to attach yourself near.</p>

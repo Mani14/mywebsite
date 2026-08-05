@@ -182,19 +182,22 @@ const FamilyTree = forwardRef(function FamilyTree(
     }
   }, [layout, rootId]);
 
-  // Re-centre whenever the focus person changes (e.g. after "Set as Root"), and reset
-  // zoom back to 1 at the same time. Without the zoom reset, a level carried over
-  // from whatever was previously on screen (a different person's Pedigree View, or a
-  // zoomed-out Full Tree View) breaks the auto-centring math for the new layout:
+  // Re-centre when the *pedigree* root changes (e.g. "Jump to their family" from one
+  // lineage to another while already in Pedigree View), and reset zoom back to 1 at
+  // the same time. Without the zoom reset, a level carried over from whatever was
+  // previously on screen breaks the auto-centring math for the new layout:
   // centerTree()'s pan formula assumes zoom 1, so at any other zoom the computed pan
   // lands the content off-screen — it looks blank until "reset view" is clicked
-  // (which resets zoom AND pan together, masking the bug). Also reset on a pure mode
-  // switch (forest <-> pedigree) even when rootId happens to stay the same, since the
-  // two layouts are entirely different shapes.
+  // (which resets zoom AND pan together, masking the bug). Gated to Pedigree View
+  // only: that's the one mode where rootId actually reshapes the layout (forestLayout
+  // is keyed on priorityId, not rootId) — in Forest View, rootId only changes from
+  // plain focus/select taps as you browse around, and re-centring the camera on every
+  // tap made the view jump wildly instead of staying put.
   useEffect(() => {
+    if (mode !== 'pedigree') return;
     didCenter.current = false;
     setZoom(1);
-  }, [rootId]);
+  }, [rootId, mode]);
 
   useEffect(() => {
     didCenter.current = false;

@@ -472,11 +472,11 @@ export default function App() {
                 type="button"
                 className="icon-btn"
                 onClick={() => setShowAttachWizard(true)}
-                aria-label="Attach yourself to the family tree"
+                aria-label="Add yourself to the family tree"
                 title="Link your account to yourself in the family tree"
               >
                 <Link2 size={17} />
-                <span className="btn-label">Attach Yourself</span>
+                <span className="btn-label">Add Me</span>
               </button>
             )}
             <button type="button" className="icon-btn" onClick={signOut} aria-label="Sign out" title={`Sign out (${user.email})`}>
@@ -492,7 +492,7 @@ export default function App() {
           <Link2 size={14} />
           <span>Not linked yet</span>
           <button type="button" onClick={() => setShowAttachWizard(true)}>
-            Attach
+            Add Me
           </button>
         </div>
       ) : (
