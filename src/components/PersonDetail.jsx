@@ -46,7 +46,8 @@ export default function PersonDetail({
   person,
   persons,
   isRoot,
-  rootPersonId,
+  anchorId,
+  anchorContext,
   isHighlighted,
   meId,
   onSetMe,
@@ -71,7 +72,8 @@ export default function PersonDetail({
   const children = getChildren(persons, person);
   const siblings = getSiblings(persons, person);
   const ageInfo = getAgeInfo(person);
-  const relationshipLabel = getRelationshipLabel(persons, person.id, rootPersonId);
+  const baseRelationship = anchorId ? getRelationshipLabel(persons, person.id, anchorId) : null;
+  const relationshipLabel = baseRelationship ? `${baseRelationship} (to ${anchorContext})` : null;
   const daysUntilBirthday = person.isAlive ? getDaysUntilBirthday(person.dob) : null;
   const stats = getFamilyStats(persons, person);
   const hasStats = stats && (stats.childrenCount > 0 || stats.grandchildrenCount > 0 || stats.siblingsCount > 0);

@@ -359,10 +359,10 @@
       "marriageDate": "",
       "parentIds": [],
       "childrenIds": [
-        "murugesh",
+        "sangeeta",
         "ramila",
-        "dharmadurai",
-        "purushoth",
+        "bhuvaneswari",
+        "praba",
         "barani"
       ]
     },
@@ -386,10 +386,10 @@
         "saraswatiS"
       ],
       "childrenIds": [
-        "murugesh",
+        "sangeeta",
         "ramila",
-        "dharmadurai",
-        "purushoth",
+        "bhuvaneswari",
+        "praba",
         "barani"
       ]
     },
@@ -408,10 +408,7 @@
       "notes": "",
       "spouseId": "sangeeta",
       "marriageDate": "",
-      "parentIds": [
-        "narayanan",
-        "renganayaki"
-      ],
+      "parentIds": [],
       "childrenIds": [
         "sakthiVendan",
         "sanjani"
@@ -432,7 +429,10 @@
       "notes": "",
       "spouseId": "murugesh",
       "marriageDate": "",
-      "parentIds": [],
+      "parentIds": [
+        "narayanan",
+        "renganayaki"
+      ],
       "childrenIds": [
         "sakthiVendan",
         "sanjani"
@@ -582,10 +582,7 @@
       "notes": "",
       "spouseId": "bhuvaneswari",
       "marriageDate": "",
-      "parentIds": [
-        "narayanan",
-        "renganayaki"
-      ],
+      "parentIds": [],
       "childrenIds": [
         "shyam",
         "santosh"
@@ -606,7 +603,10 @@
       "notes": "",
       "spouseId": "dharmadurai",
       "marriageDate": "",
-      "parentIds": [],
+      "parentIds": [
+        "narayanan",
+        "renganayaki"
+      ],
       "childrenIds": [
         "shyam",
         "santosh"
@@ -669,10 +669,7 @@
       "notes": "",
       "spouseId": "praba",
       "marriageDate": "",
-      "parentIds": [
-        "narayanan",
-        "renganayaki"
-      ],
+      "parentIds": [],
       "childrenIds": [
         "dharshanP",
         "saiP"
@@ -693,7 +690,10 @@
       "notes": "",
       "spouseId": "purushoth",
       "marriageDate": "",
-      "parentIds": [],
+      "parentIds": [
+        "narayanan",
+        "renganayaki"
+      ],
       "childrenIds": [
         "dharshanP",
         "saiP"

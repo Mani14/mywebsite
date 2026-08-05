@@ -16,15 +16,33 @@
   position: relative;
 }
 
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  /* Fixed emblem colours (independent of theme) so the mark reads as a stable badge. */
+  color: #0f172a;
+  background: linear-gradient(160deg, #f8fafc, #e6ebf2);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06), var(--shadow-sm);
+  flex-shrink: 0;
+}
+
 .app-header h1 {
   margin: 0;
   font-size: var(--font-xl);
   font-weight: 700;
+  letter-spacing: -0.015em;
   white-space: nowrap;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-female));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--color-text);
 }
 
 .app-header-count {
@@ -240,9 +258,18 @@
     align-items: center;
   }
 
+  .app-logo {
+    flex: 1 1 auto;
+    gap: 8px;
+  }
+
+  .app-logo-mark {
+    width: 30px;
+    height: 30px;
+  }
+
   .app-header h1 {
     font-size: var(--font-lg);
-    flex: 1 1 auto;
   }
 
   .app-save-indicator span {

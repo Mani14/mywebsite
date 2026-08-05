@@ -466,35 +466,22 @@ function ordinal(n) {
   return `${n}th`;
 }
 
-// Plain-language blood/marriage relationship of `personId` to `rootId` (e.g.
-// "Grandson", "Aunt", "2nd Cousin"), based on the nearest common recorded
-// ancestor. Returns null for the root themselves, an unrelated/unrecorded
-// pair, or when either id is missing.
-export function getRelationshipLabel(persons, personId, rootId) {
-  if (!personId || !rootId || personId === rootId) return null;
-  const person = getPerson(persons, personId);
-  const root = getPerson(persons, rootId);
-  if (!person || !root) return null;
-
-  if (person.spouseId === rootId) return 'Spouse';
-
-  const male = person.gender === 'male';
-  const female = person.gender === 'female';
-
-  const personAncestors = ancestorDistances(persons, personId);
-  const rootAncestors = ancestorDistances(persons, rootId);
-
+// Nearest common ancestor between two people (via parentIds BFS). Returns the step
+// distances { distA, distB } from each up to that ancestor, or null if unrelated.
+function commonAncestor(persons, aId, bId) {
+  const aAncestors = ancestorDistances(persons, aId);
+  const bAncestors = ancestorDistances(persons, bId);
   let best = null;
-  for (const [ancestorId, distPerson] of personAncestors) {
-    const distRoot = rootAncestors.get(ancestorId);
-    if (distRoot == null) continue;
-    if (!best || distRoot + distPerson < best.distRoot + best.distPerson) {
-      best = { distRoot, distPerson };
-    }
+  for (const [ancestorId, distA] of aAncestors) {
+    const distB = bAncestors.get(ancestorId);
+    if (distB == null) continue;
+    if (!best || distA + distB < best.distA + best.distB) best = { distA, distB };
   }
-  if (!best) return null;
-  const { distRoot, distPerson } = best;
+  return best;
+}
 
+// Blood label from the person's and root's distances to their common ancestor.
+function bloodLabelFromDistances(distPerson, distRoot, male, female) {
   // root is the common ancestor: person descends from root.
   if (distRoot === 0) {
     if (distPerson === 1) return male ? 'Son' : female ? 'Daughter' : 'Child';
@@ -530,6 +517,96 @@ export function getRelationshipLabel(persons, personId, rootId) {
     return male ? `${prefix}Grand-Uncle` : female ? `${prefix}Grand-Aunt` : `${prefix}Grand-Aunt/Uncle`;
   }
   return `${ordinal(distPerson - 1)} Cousin, ${removed}x Removed`;
+}
+
+function bloodLabel(persons, personId, rootId, male, female) {
+  const best = commonAncestor(persons, personId, rootId);
+  if (!best) return null;
+  return bloodLabelFromDistances(best.distA, best.distB, male, female);
+}
+
+// person married INTO root's blood family: person's spouse is `dist`-related to root.
+// distSP/distRoot are the spouse's and root's distances to their common ancestor.
+function inLawTermMarriedIn(distSP, distRoot, male, female) {
+  if (distRoot === 0) {
+    if (distSP === 1) return male ? 'Son-in-law' : female ? 'Daughter-in-law' : 'Child-in-law';
+    if (distSP === 2) return male ? 'Grandson-in-law' : female ? 'Granddaughter-in-law' : 'Grandchild-in-law';
+    const prefix = greatPrefix(distSP - 2);
+    return male ? `${prefix}Great-Grandson-in-law` : female ? `${prefix}Great-Granddaughter-in-law` : `${prefix}Great-Grandchild-in-law`;
+  }
+  if (distRoot === 1 && distSP === 1) return male ? 'Brother-in-law' : female ? 'Sister-in-law' : 'Sibling-in-law';
+  if (distSP === 1 && distRoot === 2) return male ? 'Uncle-in-law' : female ? 'Aunt-in-law' : 'Aunt/Uncle-in-law';
+  if (distSP === 1 && distRoot > 2) {
+    const prefix = greatPrefix(distRoot - 2);
+    return male ? `${prefix}Grand-Uncle-in-law` : female ? `${prefix}Grand-Aunt-in-law` : `${prefix}Grand-Aunt/Uncle-in-law`;
+  }
+  return null;
+}
+
+// person is blood kin of root's spouse (RS): person is `dist`-related to RS.
+function inLawTermSpouseKin(distPerson, distRS, male, female) {
+  if (distPerson === 0) {
+    if (distRS === 1) return male ? 'Father-in-law' : female ? 'Mother-in-law' : 'Parent-in-law';
+    if (distRS === 2) return male ? 'Grandfather-in-law' : female ? 'Grandmother-in-law' : 'Grandparent-in-law';
+    const prefix = greatPrefix(distRS - 2);
+    return male ? `${prefix}Great-Grandfather-in-law` : female ? `${prefix}Great-Grandmother-in-law` : `${prefix}Great-Grandparent-in-law`;
+  }
+  if (distPerson === 1 && distRS === 1) return male ? 'Brother-in-law' : female ? 'Sister-in-law' : 'Sibling-in-law';
+  if (distPerson === 1 && distRS === 2) return male ? 'Uncle-in-law' : female ? 'Aunt-in-law' : 'Aunt/Uncle-in-law';
+  if (distPerson === 1 && distRS > 2) {
+    const prefix = greatPrefix(distRS - 2);
+    return male ? `${prefix}Grand-Uncle-in-law` : female ? `${prefix}Grand-Aunt-in-law` : `${prefix}Grand-Aunt/Uncle-in-law`;
+  }
+  return null;
+}
+
+// Marriage-based (in-law) relationship of person to root, one marriage hop from a blood
+// tie in either direction. Returns the closest match, or null if none in scope.
+function inLawLabel(persons, personId, rootId, male, female) {
+  const person = getPerson(persons, personId);
+  const root = getPerson(persons, rootId);
+  if (!person || !root) return null;
+  const candidates = [];
+
+  if (person.spouseId && person.spouseId !== rootId) {
+    const ca = commonAncestor(persons, person.spouseId, rootId);
+    if (ca) {
+      const term = inLawTermMarriedIn(ca.distA, ca.distB, male, female);
+      if (term) candidates.push({ term, cost: ca.distA + ca.distB });
+    }
+  }
+  if (root.spouseId && root.spouseId !== personId) {
+    const ca = commonAncestor(persons, personId, root.spouseId);
+    if (ca) {
+      const term = inLawTermSpouseKin(ca.distA, ca.distB, male, female);
+      if (term) candidates.push({ term, cost: ca.distA + ca.distB });
+    }
+  }
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => a.cost - b.cost);
+  return candidates[0].term;
+}
+
+// Plain-language relationship of `personId` to `rootId` — blood (e.g. "Grandson",
+// "Aunt", "2nd Cousin"), marriage/in-law (e.g. "Sister-in-law"), or both joined with
+// " / " when a person is related in more than one way. Returns null for the root
+// themselves, an unrelated/unrecorded pair, or when either id is missing.
+export function getRelationshipLabel(persons, personId, rootId) {
+  if (!personId || !rootId || personId === rootId) return null;
+  const person = getPerson(persons, personId);
+  const root = getPerson(persons, rootId);
+  if (!person || !root) return null;
+
+  if (person.spouseId === rootId) return 'Spouse';
+
+  const male = person.gender === 'male';
+  const female = person.gender === 'female';
+
+  const parts = [
+    bloodLabel(persons, personId, rootId, male, female),
+    inLawLabel(persons, personId, rootId, male, female),
+  ].filter(Boolean);
+  return parts.length ? parts.join(' / ') : null;
 }
 
 let idCounter = 0;

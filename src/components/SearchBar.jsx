@@ -1,14 +1,19 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { BadgeCheck, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getFullName } from '../utils/familyUtils';
 import '../styles/SearchBar.css';
 
 const MAX_RESULTS = 8;
 
-export default function SearchBar({ persons, onSelect, meId, onSetMe }) {
+export default function SearchBar({ persons, onLocate, onViewDetails, meId, onSetMe }) {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  // Distinguishes a single click (locate) from a double click (view details): the
+  // first click waits briefly to see if a second one lands before acting.
+  const clickTimerRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(clickTimerRef.current), []);
 
   const matches = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -18,18 +23,33 @@ export default function SearchBar({ persons, onSelect, meId, onSetMe }) {
       .slice(0, MAX_RESULTS);
   }, [persons, query]);
 
-  const handleSelect = (id) => {
-    onSelect(id);
+  const close = () => {
     setQuery('');
     setIsOpen(false);
   };
 
+  const handleResultClick = (id) => {
+    if (clickTimerRef.current) return; // a double-click is in progress
+    clickTimerRef.current = setTimeout(() => {
+      clickTimerRef.current = null;
+      onLocate(id);
+      close();
+    }, 250);
+  };
+
+  const handleResultDoubleClick = (id) => {
+    clearTimeout(clickTimerRef.current);
+    clickTimerRef.current = null;
+    onViewDetails(id);
+    close();
+  };
+
   const handleKeyDown = (e) => {
     if (e.key === 'Escape') {
-      setQuery('');
-      setIsOpen(false);
+      close();
     } else if (e.key === 'Enter' && matches.length > 0) {
-      handleSelect(matches[0].id);
+      onViewDetails(matches[0].id);
+      close();
     }
   };
 
@@ -63,7 +83,12 @@ export default function SearchBar({ persons, onSelect, meId, onSetMe }) {
                 const isMe = !!meId && meId === person.id;
                 return (
                   <li key={person.id} className="search-bar-result-row">
-                    <button type="button" onClick={() => handleSelect(person.id)}>
+                    <button
+                      type="button"
+                      onClick={() => handleResultClick(person.id)}
+                      onDoubleClick={() => handleResultDoubleClick(person.id)}
+                      title="Click to locate · double-click for details"
+                    >
                       {getFullName(person)}
                     </button>
                     {onSetMe && (

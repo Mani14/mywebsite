@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, GitBranch, Link2, LogOut, Menu, Redo2, Undo2 } from 'lucide-react';
+import { ArrowLeft, Check, GitBranch, Link2, LocateFixed, LogOut, Menu, Redo2, Undo2 } from 'lucide-react';
 import { useFamily } from './hooks/useFamily';
 import { useAuth } from './hooks/useAuth';
 import Login from './components/Login';
 import AttachYourself from './components/AttachYourself';
+import BrandLogo from './components/BrandLogo';
 import FamilyTree from './components/FamilyTree';
 import SearchBar from './components/SearchBar';
 import PersonDetail from './components/PersonDetail';
@@ -52,6 +53,9 @@ export default function App() {
   const [highlightedChain, setHighlightedChain] = useState([]); // ordered ids from a person up to their root, or [] if none
   const [showStatsPanel, setShowStatsPanel] = useState(false);
   const [showAttachWizard, setShowAttachWizard] = useState(false);
+  // Person the relationship badge is measured against — set only by explicit "Set as
+  // Root"; falls back to "me" so relationships read relative to you by default.
+  const [explicitRootId, setExplicitRootId] = useState(null);
   const treeRef = useRef(null);
 
   const toggleCollapse = useCallback((id) => {
@@ -93,6 +97,7 @@ export default function App() {
   const handleSetAsRoot = useCallback(() => {
     if (!selectedId) return;
     setRoot(selectedId);
+    setExplicitRootId(selectedId);
     setViewMode('pedigree');
   }, [selectedId, setRoot]);
 
@@ -276,10 +281,18 @@ export default function App() {
 
   // Search is explicit navigation intent regardless of view mode, unlike a plain
   // canvas click (handleSelect), so it always moves the focus/pedigree root.
-  const handleSearchSelect = useCallback((id) => {
+  const handleViewPersonDetails = useCallback((id) => {
     revealAncestors(id);
     setSelectedId(id);
     setFocusId(id);
+  }, [revealAncestors]);
+
+  // Locate (search single-click, and the "Locate Me" pill) centres/highlights a
+  // person WITHOUT opening their detail panel — deliberately no setSelectedId.
+  const handleLocatePerson = useCallback((id) => {
+    revealAncestors(id);
+    setFocusId(id);
+    setHighlightedChain([id]);
   }, [revealAncestors]);
 
   // Import replaces the whole dataset, then re-syncs any open selection/focus.
@@ -293,6 +306,13 @@ export default function App() {
   const selected = getPerson(persons, selectedId);
   const isAlreadyRoot = selectedId === rootPersonId;
   const focusedPerson = getPerson(persons, focusId || rootPersonId);
+
+  // The relationship badge is measured against an explicitly-set root if there is one,
+  // otherwise "me"; when neither exists there's no anchor and the badge is hidden.
+  const relationshipAnchorId = explicitRootId || meId || null;
+  const relationshipAnchorContext = relationshipAnchorId
+    ? (relationshipAnchorId === meId ? 'you' : getPerson(persons, relationshipAnchorId)?.firstName || 'root')
+    : null;
 
   // Unlink actions remove one relationship without deleting either person. `selected`
   // is always the person currently open in the detail panel; the argument is whoever
@@ -330,7 +350,10 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header glass-surface">
-        <h1>Family Tree</h1>
+        <div className="app-logo">
+          <span className="app-logo-mark"><BrandLogo size={22} /></span>
+          <h1>Family Tree</h1>
+        </div>
         {Object.keys(persons).length > 0 && (
           <span className="app-header-count">{Object.keys(persons).length} members</span>
         )}
@@ -343,7 +366,7 @@ export default function App() {
         >
           <Menu size={17} />
         </button>
-        <SearchBar persons={persons} onSelect={handleSearchSelect} meId={meId} onSetMe={handleSetMe} />
+        <SearchBar persons={persons} onLocate={handleLocatePerson} onViewDetails={handleViewPersonDetails} meId={meId} onSetMe={handleSetMe} />
         <div className="app-header-actions">
           <AnimatePresence>
             {saveState === 'saved' && (
@@ -417,12 +440,19 @@ export default function App() {
         </div>
       </header>
 
-      {!meId && (
+      {!meId ? (
         <div className="app-attach-pill glass-surface">
           <Link2 size={14} />
           <span>Not linked yet</span>
           <button type="button" onClick={() => setShowAttachWizard(true)}>
             Attach
+          </button>
+        </div>
+      ) : (
+        <div className="app-attach-pill glass-surface">
+          <LocateFixed size={14} />
+          <button type="button" onClick={() => handleLocatePerson(meId)}>
+            Locate Me
           </button>
         </div>
       )}
@@ -444,7 +474,7 @@ export default function App() {
         </div>
       )}
 
-      <BirthdayWidget persons={persons} onSelect={handleSearchSelect} />
+      <BirthdayWidget persons={persons} onSelect={handleViewPersonDetails} />
 
       <main className="app-main">
         {rootPersonId ? (
@@ -478,7 +508,8 @@ export default function App() {
               person={selected}
               persons={persons}
               isRoot={isAlreadyRoot}
-              rootPersonId={rootPersonId}
+              anchorId={relationshipAnchorId}
+              anchorContext={relationshipAnchorContext}
               isHighlighted={highlightedIds.has(selected.id)}
               meId={meId}
               onSetMe={handleSetMe}
