@@ -589,7 +589,7 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      <StatsPanel persons={persons} isOpen={showStatsPanel} onClose={() => setShowStatsPanel(false)} />
+      <StatsPanel persons={persons} isOpen={showStatsPanel} onClose={() => setShowStatsPanel(false)} onSelect={handleLocatePerson} />
 
       {showAttachWizard && (
         <AttachYourself
