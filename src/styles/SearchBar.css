@@ -47,6 +47,14 @@
   overflow-y: auto;
 }
 
+/* Opaque dropdown (overrides the translucent .glass-surface) so results stay readable
+   over the busy tree behind them. */
+.search-bar-results.glass-surface {
+  background: var(--color-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .search-bar-results li + li {
   margin-top: 2px;
 }

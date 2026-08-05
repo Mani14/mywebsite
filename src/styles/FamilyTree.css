@@ -345,8 +345,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 50%;
   border: 2px solid var(--color-surface);
@@ -356,6 +356,15 @@
   box-shadow: var(--shadow-md);
   z-index: 3;
   transition: transform var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+/* Invisible ~48px hit zone so the small arrow is reliably tappable on touch screens
+   (taps near it open the tree page instead of landing on the card behind it). */
+.mini-card-jump::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
 }
 
 .mini-card-jump:hover {

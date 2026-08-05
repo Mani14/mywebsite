@@ -31,6 +31,13 @@
   box-shadow: var(--shadow-lg);
 }
 
+/* Opaque dropdown (overrides the translucent .glass-surface). */
+.import-export-menu.glass-surface {
+  background: var(--color-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .import-export-menu button {
   display: flex;
   align-items: center;
