@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, Download, FileImage, FileText, Upload } from 'lucide-react';
 import { validateFamilyData } from '../utils/familyUtils';
@@ -6,14 +7,37 @@ import '../styles/ImportExport.css';
 
 export default function ImportExport({ exportData, onImport, onExportImage, onExportPDF }) {
   const fileInputRef = useRef(null);
+  const triggerRef = useRef(null);
   const menuRef = useRef(null);
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
+  // Rendered via a portal (see below), so its position has to be tracked in JS
+  // rather than a plain `position: absolute` against its natural parent.
+  const [menuPos, setMenuPos] = useState(null);
+
+  // The header's mobile horizontally-scrolling strip (`.app-header-actions`)
+  // sets `overflow-x: auto`, which forces the browser to also clip `overflow-y`
+  // — silently hiding this menu instead of showing it. Portal it to <body> and
+  // position it with fixed coords so no ancestor's scroll/clipping can hide it.
+  useEffect(() => {
+    if (!open) return undefined;
+    const updatePos = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (rect) setMenuPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+    };
+    updatePos();
+    window.addEventListener('resize', updatePos);
+    window.addEventListener('scroll', updatePos, true);
+    return () => {
+      window.removeEventListener('resize', updatePos);
+      window.removeEventListener('scroll', updatePos, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
     const handleClick = (e) => {
-      if (!menuRef.current?.contains(e.target)) setOpen(false);
+      if (!triggerRef.current?.contains(e.target) && !menuRef.current?.contains(e.target)) setOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -64,8 +88,9 @@ export default function ImportExport({ exportData, onImport, onExportImage, onEx
   };
 
   return (
-    <div className="import-export" ref={menuRef}>
+    <div className="import-export">
       <button
+        ref={triggerRef}
         type="button"
         className="icon-btn import-export-trigger"
         onClick={() => setOpen((o) => !o)}
@@ -80,10 +105,12 @@ export default function ImportExport({ exportData, onImport, onExportImage, onEx
       </button>
 
       <AnimatePresence>
-        {open && (
+        {open && menuPos && createPortal(
           <motion.div
+            ref={menuRef}
             className="import-export-menu glass-surface"
             role="menu"
+            style={{ top: menuPos.top, right: menuPos.right }}
             initial={{ opacity: 0, y: -6, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.96 }}
@@ -105,7 +132,8 @@ export default function ImportExport({ exportData, onImport, onExportImage, onEx
                 <FileText size={15} /> Export PDF
               </button>
             )}
-          </motion.div>
+          </motion.div>,
+          document.body
         )}
       </AnimatePresence>
 
