@@ -16,9 +16,11 @@
   transition: opacity var(--duration-base) var(--ease), box-shadow var(--duration-base) var(--ease);
 }
 
-.mini-map:hover {
-  opacity: 1;
-  box-shadow: var(--shadow-lg);
+@media (hover: hover) {
+  .mini-map:hover {
+    opacity: 1;
+    box-shadow: var(--shadow-lg);
+  }
 }
 
 .mini-map-dot {

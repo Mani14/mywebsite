@@ -29,9 +29,11 @@
   transition: border-color var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease);
 }
 
-.stats-panel-card:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .stats-panel-card:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-1px);
+  }
 }
 
 .stats-panel-card.is-open {
@@ -131,9 +133,11 @@
   transition: border-color var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
 }
 
-.stats-panel-name:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+@media (hover: hover) {
+  .stats-panel-name:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
 }
 
 .stats-panel-couple {

@@ -50,9 +50,11 @@
   transition: border-color var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease);
 }
 
-.login-google-btn:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .login-google-btn:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-1px);
+  }
 }
 
 .login-error {

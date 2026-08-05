@@ -40,10 +40,12 @@
     transform var(--duration-fast) var(--ease);
 }
 
-.modal-close:hover {
-  color: var(--color-text);
-  background: var(--color-bg);
-  transform: scale(1.06);
+@media (hover: hover) {
+  .modal-close:hover {
+    color: var(--color-text);
+    background: var(--color-bg);
+    transform: scale(1.06);
+  }
 }
 
 @media (max-width: 640px) {

@@ -79,8 +79,10 @@
   transition: background var(--duration-fast) var(--ease);
 }
 
-.search-bar-results button:hover {
-  background: var(--color-bg);
+@media (hover: hover) {
+  .search-bar-results button:hover {
+    background: var(--color-bg);
+  }
 }
 
 .search-bar-mark-me {
@@ -93,8 +95,10 @@
   color: var(--color-text-muted);
 }
 
-.search-bar-mark-me:hover {
-  color: var(--color-primary);
+@media (hover: hover) {
+  .search-bar-mark-me:hover {
+    color: var(--color-primary);
+  }
 }
 
 .search-bar-mark-me.is-me {

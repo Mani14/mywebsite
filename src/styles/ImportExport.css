@@ -56,9 +56,11 @@
   transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
 }
 
-.import-export-menu button:hover {
-  background: var(--color-primary);
-  color: #fff;
+@media (hover: hover) {
+  .import-export-menu button:hover {
+    background: var(--color-primary);
+    color: #fff;
+  }
 }
 
 .import-export-error {

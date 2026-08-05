@@ -41,9 +41,11 @@
   cursor: pointer;
 }
 
-.attach-search-results button:hover {
-  background: var(--color-primary);
-  color: #fff;
+@media (hover: hover) {
+  .attach-search-results button:hover {
+    background: var(--color-primary);
+    color: #fff;
+  }
 }
 
 .attach-step-empty {
@@ -63,9 +65,11 @@
   font-weight: 600;
 }
 
-.attach-this-is-me-btn:hover {
-  background: var(--color-primary);
-  color: #fff;
+@media (hover: hover) {
+  .attach-this-is-me-btn:hover {
+    background: var(--color-primary);
+    color: #fff;
+  }
 }
 
 .attach-relation-options {
@@ -84,9 +88,11 @@
   font-size: 0.9rem;
 }
 
-.attach-relation-options button:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+@media (hover: hover) {
+  .attach-relation-options button:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
 }
 
 .attach-back-btn {
@@ -99,6 +105,8 @@
   padding: 4px 0;
 }
 
-.attach-back-btn:hover {
-  color: var(--color-primary);
+@media (hover: hover) {
+  .attach-back-btn:hover {
+    color: var(--color-primary);
+  }
 }

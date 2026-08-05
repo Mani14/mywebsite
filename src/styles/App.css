@@ -165,8 +165,10 @@
   cursor: pointer;
 }
 
-.app-attach-pill button:hover {
-  filter: brightness(1.08);
+@media (hover: hover) {
+  .app-attach-pill button:hover {
+    filter: brightness(1.08);
+  }
 }
 
 .pedigree-breadcrumb {
@@ -196,9 +198,11 @@
   transition: border-color var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease);
 }
 
-.pedigree-breadcrumb-back:hover {
-  border-color: var(--color-primary);
-  transform: translateX(-2px);
+@media (hover: hover) {
+  .pedigree-breadcrumb-back:hover {
+    border-color: var(--color-primary);
+    transform: translateX(-2px);
+  }
 }
 
 .pedigree-breadcrumb-label {
@@ -239,10 +243,12 @@
   transition: transform var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
-.app-empty-state button:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+@media (hover: hover) {
+  .app-empty-state button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
 }
 
 @media (max-width: 900px) {

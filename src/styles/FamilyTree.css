@@ -420,9 +420,11 @@
   transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
 }
 
-.mini-card-menu button:hover {
-  background: var(--color-bg);
-  color: var(--color-primary);
+@media (hover: hover) {
+  .mini-card-menu button:hover {
+    background: var(--color-bg);
+    color: var(--color-primary);
+  }
 }
 
 .toggle-btn {
@@ -445,11 +447,13 @@
     transform var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease);
 }
 
-.toggle-btn:hover {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--color-primary) 70%, white 30%), var(--color-primary));
-  color: #fff;
-  border-color: var(--color-primary);
-  transform: translateX(-50%) scale(1.1);
+@media (hover: hover) {
+  .toggle-btn:hover {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--color-primary) 70%, white 30%), var(--color-primary));
+    color: #fff;
+    border-color: var(--color-primary);
+    transform: translateX(-50%) scale(1.1);
+  }
 }
 
 /* Floating zoom controls */

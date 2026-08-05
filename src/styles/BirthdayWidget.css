@@ -40,8 +40,10 @@
   transition: opacity var(--duration-fast) var(--ease);
 }
 
-.birthday-widget-item:hover {
-  opacity: 0.7;
+@media (hover: hover) {
+  .birthday-widget-item:hover {
+    opacity: 0.7;
+  }
 }
 
 .birthday-widget-close {
@@ -57,6 +59,8 @@
   transition: background var(--duration-fast) var(--ease);
 }
 
-.birthday-widget-close:hover {
-  background: rgba(0, 0, 0, 0.08);
+@media (hover: hover) {
+  .birthday-widget-close:hover {
+    background: rgba(0, 0, 0, 0.08);
+  }
 }
