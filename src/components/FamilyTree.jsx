@@ -195,9 +195,17 @@ const FamilyTree = forwardRef(function FamilyTree(
   );
 
   const pinchDistance = (pts) => Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  // A finger starting on a card still needs to pan if it moves — but a plain tap
+  // must reach the card's onClick, so panning only "activates" once the finger has
+  // travelled past this many px, and pointer capture is deferred until then so the
+  // browser is still free to fire a normal click for anything under it.
+  const PAN_ACTIVATE_PX = 8;
+  // Set true the moment a drag activates, read by suppressClick below — kept separate
+  // from drag.current since endDrag (pointerup) clears that before the resulting
+  // `click` event fires, so drag.current.active is already gone by the time it matters.
+  const draggedRef = useRef(false);
 
   const onMouseDown = (e) => {
-    const el = e.currentTarget;
     // Track every pointer's position regardless of what it started on — a finger
     // resting on a card still needs to count toward a pinch gesture if a second
     // finger comes down elsewhere.
@@ -209,7 +217,7 @@ const FamilyTree = forwardRef(function FamilyTree(
       drag.current = null;
       pointers.current.forEach((_, id) => {
         try {
-          el.setPointerCapture(id);
+          e.currentTarget.setPointerCapture(id);
         } catch {
           // pointer may already be gone — safe to ignore
         }
@@ -220,15 +228,11 @@ const FamilyTree = forwardRef(function FamilyTree(
       return;
     }
 
-    // Don't hijack clicks on cards/toggle buttons — only pan when starting on empty canvas.
-    if (e.button !== 0 || e.target.closest('button')) return;
-    drag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
-    setIsDragging(true);
-    try {
-      el.setPointerCapture(e.pointerId);
-    } catch {
-      // ignore — capture is best-effort
-    }
+    if (e.button !== 0) return;
+    // `active: false` until movement clears PAN_ACTIVATE_PX (see onMouseMove) — lets a
+    // tap on a card/button still register as a click instead of being hijacked as a pan.
+    drag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y, active: false };
+    draggedRef.current = false;
   };
   const onMouseMove = (e) => {
     if (!pointers.current.has(e.pointerId)) return;
@@ -248,6 +252,18 @@ const FamilyTree = forwardRef(function FamilyTree(
     }
 
     if (!drag.current) return;
+    if (!drag.current.active) {
+      const moved = Math.hypot(e.clientX - drag.current.startX, e.clientY - drag.current.startY);
+      if (moved < PAN_ACTIVATE_PX) return;
+      drag.current.active = true;
+      draggedRef.current = true;
+      setIsDragging(true);
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // ignore — capture is best-effort
+      }
+    }
     setPan({
       x: drag.current.panX + (e.clientX - drag.current.startX),
       y: drag.current.panY + (e.clientY - drag.current.startY),
@@ -277,12 +293,22 @@ const FamilyTree = forwardRef(function FamilyTree(
       // Dropped from two fingers to one — resume single-finger panning from
       // here instead of jumping back to wherever the very first touch started.
       const [[, pos]] = pointers.current.entries();
-      drag.current = { startX: pos.x, startY: pos.y, panX: pan.x, panY: pan.y };
+      drag.current = { startX: pos.x, startY: pos.y, panX: pan.x, panY: pan.y, active: true };
       return;
     }
 
     drag.current = null;
     setIsDragging(false);
+  };
+
+  // A drag that moved past PAN_ACTIVATE_PX shouldn't also trigger whatever card/button
+  // the finger happened to end up over — otherwise panning across a person opens their
+  // detail view the moment you lift your finger.
+  const suppressClick = (e) => {
+    if (!draggedRef.current) return;
+    draggedRef.current = false;
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   // Anchored on the viewport centre so the +/- buttons zoom toward/away from whatever
@@ -352,6 +378,7 @@ const FamilyTree = forwardRef(function FamilyTree(
         onPointerMove={onMouseMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
+        onClickCapture={suppressClick}
       >
         <div
           className="tree-world"
