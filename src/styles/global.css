@@ -126,6 +126,18 @@ body,
   overflow-x: hidden;
 }
 
+/* Mobile browsers resize their address/tab bar in and out as you scroll, and plain
+   `height: 100%`/`100vh` resolve against the TALLEST state — so the app was sized
+   taller than the space actually visible once the bars were showing, making the
+   bottom (zoom controls, mobile detail sheet) get cut off or require a scroll that
+   the fixed-height flex layout wasn't built for. `100dvh` tracks the real, current
+   visible height instead. */
+@supports (height: 100dvh) {
+  html {
+    height: 100dvh;
+  }
+}
+
 body {
   font-family: var(--font);
   color: var(--color-text);

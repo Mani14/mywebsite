@@ -77,6 +77,16 @@ const FamilyTree = forwardRef(function FamilyTree(
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 40 });
   const drag = useRef(null);
+  // Every currently-active touch/pointer on the canvas, keyed by pointerId — needed
+  // (instead of just `drag`) to detect a second finger landing for pinch-to-zoom, and
+  // to keep tracking positions even for a pointer that started on a card/button (see
+  // onMouseDown below) so it still counts if a second finger joins it mid-tap.
+  const pointers = useRef(new Map());
+  // Pinch-zoom baseline captured the moment a 2nd finger touches down: the starting
+  // finger-to-finger distance and zoom level, so the live ratio between the current
+  // and starting distance can be applied as a multiplier — re-baselined every time a
+  // finger lifts (see endDrag) so releasing one finger never snaps the zoom.
+  const pinch = useRef(null);
   const didCenter = useRef(false);
   // Gates the CSS transition below — on while zooming via the +/- buttons so the jump
   // eases in smoothly, off while drag-panning so the tree tracks the cursor instantly.
@@ -184,15 +194,59 @@ const FamilyTree = forwardRef(function FamilyTree(
     [zoomAt]
   );
 
+  const pinchDistance = (pts) => Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+
   const onMouseDown = (e) => {
-    if (e.button !== 0) return;
+    const el = e.currentTarget;
+    // Track every pointer's position regardless of what it started on — a finger
+    // resting on a card still needs to count toward a pinch gesture if a second
+    // finger comes down elsewhere.
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.current.size >= 2) {
+      // Two fingers down = pinch-zoom, even if one of them started on a card —
+      // capture both now and abandon any single-finger pan/tap in progress.
+      drag.current = null;
+      pointers.current.forEach((_, id) => {
+        try {
+          el.setPointerCapture(id);
+        } catch {
+          // pointer may already be gone — safe to ignore
+        }
+      });
+      const pts = [...pointers.current.values()].slice(0, 2);
+      pinch.current = { startDist: pinchDistance(pts) || 1, startZoom: zoomRef.current };
+      setIsDragging(true);
+      return;
+    }
+
     // Don't hijack clicks on cards/toggle buttons — only pan when starting on empty canvas.
-    if (e.target.closest('button')) return;
+    if (e.button !== 0 || e.target.closest('button')) return;
     drag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
     setIsDragging(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore — capture is best-effort
+    }
   };
   const onMouseMove = (e) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pinch.current && pointers.current.size >= 2) {
+      const el = containerRef.current;
+      if (!el) return;
+      const pts = [...pointers.current.values()].slice(0, 2);
+      const rect = el.getBoundingClientRect();
+      const anchorX = (pts[0].x + pts[1].x) / 2 - rect.left;
+      const anchorY = (pts[0].y + pts[1].y) / 2 - rect.top;
+      const ratio = pinchDistance(pts) / pinch.current.startDist;
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinch.current.startZoom * ratio));
+      zoomAt(anchorX, anchorY, next);
+      return;
+    }
+
     if (!drag.current) return;
     setPan({
       x: drag.current.panX + (e.clientX - drag.current.startX),
@@ -200,11 +254,35 @@ const FamilyTree = forwardRef(function FamilyTree(
     });
   };
   const endDrag = (e) => {
+    pointers.current.delete(e.pointerId);
+    if (e?.currentTarget?.releasePointerCapture && e.pointerId != null && e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore — pointer may already have been released by the browser
+      }
+    }
+
+    if (pointers.current.size >= 2) {
+      // Still pinching with the remaining fingers — re-baseline so lifting one
+      // finger doesn't snap the zoom to a new value.
+      const pts = [...pointers.current.values()].slice(0, 2);
+      pinch.current = { startDist: pinchDistance(pts) || 1, startZoom: zoomRef.current };
+      return;
+    }
+
+    pinch.current = null;
+
+    if (pointers.current.size === 1) {
+      // Dropped from two fingers to one — resume single-finger panning from
+      // here instead of jumping back to wherever the very first touch started.
+      const [[, pos]] = pointers.current.entries();
+      drag.current = { startX: pos.x, startY: pos.y, panX: pan.x, panY: pan.y };
+      return;
+    }
+
     drag.current = null;
     setIsDragging(false);
-    if (e?.currentTarget?.releasePointerCapture && e.pointerId != null) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
   };
 
   // Anchored on the viewport centre so the +/- buttons zoom toward/away from whatever
