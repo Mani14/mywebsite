@@ -19,7 +19,7 @@ const QUICK_ADD_OPTIONS = [
   { mode: 'addSibling', label: 'Add Sibling', show: () => true },
 ];
 
-function MiniCard({ person, isFocus, isHighlighted, isMe, hasSpouse, showJumpLink, onSelect, onQuickAdd, onJumpTo }) {
+function MiniCard({ person, isFocus, isHighlighted, isMe, hasSpouse, showJumpLink, onFocus, onSelect, onQuickAdd, onJumpTo }) {
   const genderClass = `avatar avatar-${person.gender}`;
   const deceased = !person.isAlive;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -54,7 +54,7 @@ function MiniCard({ person, isFocus, isHighlighted, isMe, hasSpouse, showJumpLin
         type="button"
         className={`mini-card${deceased ? ' mini-card-deceased' : ''}${isFocus ? ' mini-card-focus' : ''}${isHighlighted ? ' mini-card-highlighted' : ''}`}
         style={{ width: NODE_W, height: NODE_H }}
-        onClick={() => onSelect(person.id)}
+        onClick={() => (isFocus ? onSelect(person.id) : onFocus(person.id))}
         title={getFullName(person)}
       >
         <motion.span className="mini-card-avatar-wrap" tabIndex={-1} {...avatarSpring}>
@@ -120,7 +120,7 @@ function MiniCard({ person, isFocus, isHighlighted, isMe, hasSpouse, showJumpLin
 }
 
 // A positioned node holding a person (and optional spouse) plus an expand toggle.
-export default function TreeNode({ node, index, focusId, renderedIds, side, highlightedIds, meId, onSelect, onToggle, onQuickAdd, onJumpTo }) {
+export default function TreeNode({ node, index, focusId, renderedIds, side, highlightedIds, meId, onFocus, onSelect, onToggle, onQuickAdd, onJumpTo }) {
   const { person, spouse, x, y, coupleWidth } = node;
   const left = x - coupleWidth / 2;
   const sideClass = side ? ` couple-side-${side}` : '';
@@ -181,6 +181,7 @@ export default function TreeNode({ node, index, focusId, renderedIds, side, high
           isHighlighted={!!highlightedIds?.has(person.id)}
           isMe={!!meId && person.id === meId}
           hasSpouse={!!spouse}
+          onFocus={onFocus}
           onSelect={onSelect}
           onQuickAdd={onQuickAdd}
           onJumpTo={onJumpTo}
@@ -209,6 +210,7 @@ export default function TreeNode({ node, index, focusId, renderedIds, side, high
             // here on this same canvas, which would make the jump redundant
             // (e.g. their placeholder parent is already shown one row up).
             showJumpLink={spouse.parentIds.some((pid) => !renderedIds?.has(pid))}
+            onFocus={onFocus}
             onSelect={onSelect}
             onQuickAdd={onQuickAdd}
             onJumpTo={onJumpTo}

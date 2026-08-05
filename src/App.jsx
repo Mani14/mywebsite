@@ -81,15 +81,19 @@ export default function App() {
     if (viewMode === 'forest') setFocusId(id);
   }, [viewMode]);
 
-  // "Jump to their family" (the 🔗 badge on anyone married in who has their own
+  // A tree-node's first tap just focuses the person (yellow ring) without opening
+  // their details — tapping the already-focused node is what opens the panel.
+  const handleFocusPerson = useCallback((id) => {
+    setFocusId(id);
+  }, []);
+
+  // "Jump to their family" (the blue arrow on anyone married in who has their own
   // recorded parents) opens a dedicated Pedigree View centred on THAT person,
-  // showing their own father's-side + mother's-side lineages. TreeNode only shows
-  // the badge when that parent ISN'T already drawn on the current canvas (see
-  // FamilyTree.jsx's renderedIds) — e.g. it's suppressed once the parent (or
-  // placeholder parent) is already visible one row up in the same view.
+  // showing their own father's-side + mother's-side lineages — the tree page, not
+  // the details panel (so it deliberately does NOT setSelectedId). TreeNode only
+  // shows the arrow when that parent ISN'T already drawn on the current canvas.
   const handleJumpToFamily = useCallback((id) => {
     setViewMode('pedigree');
-    setSelectedId(id);
     setFocusId(id);
   }, []);
 
@@ -263,11 +267,14 @@ export default function App() {
   }, [undo, redo]);
 
   const handleDelete = useCallback((id) => {
-    if (!window.confirm('Delete this person? This cannot be undone.')) return;
+    const person = getPerson(persons, id);
+    const name = person ? getFullName(person) : 'this person';
+    if (!window.confirm(`Delete ${name}? This cannot be undone.`)) return;
+    if (!window.confirm(`Are you sure you want to permanently delete ${name}? This also removes their links to parents, spouse, and children.`)) return;
     deletePerson(id);
     setSelectedId((prev) => (prev === id ? null : prev));
     setFocusId((prev) => (prev === id ? null : prev));
-  }, [deletePerson]);
+  }, [deletePerson, persons]);
 
   // Uncollapses every ancestor of a person so a search jump always lands on a visible node.
   const revealAncestors = useCallback((id) => {
@@ -301,6 +308,14 @@ export default function App() {
     setLocateRequest((prev) => ({ id, nonce: prev.nonce + 1 }));
   }, [revealAncestors]);
 
+  // Called by FamilyTree when a locate target isn't drawn in the current view (e.g. a
+  // trimmed satellite person like Ramesh in the Full Tree). Switch to their Pedigree
+  // View, which renders everyone in their lineage, so they become visible + centred.
+  const handleLocateNotFound = useCallback((id) => {
+    setViewMode('pedigree');
+    setFocusId(id);
+  }, []);
+
   // Import replaces the whole dataset, then re-syncs any open selection/focus.
   const handleImport = useCallback((data) => {
     replaceAll(data);
@@ -312,6 +327,25 @@ export default function App() {
   const selected = getPerson(persons, selectedId);
   const isAlreadyRoot = selectedId === rootPersonId;
   const focusedPerson = getPerson(persons, focusId || rootPersonId);
+
+  // Naming convention: a child's surname is the FATHER's (male parent's) first name.
+  const childSurnameFor = (parentId) => {
+    const parent = getPerson(persons, parentId);
+    if (!parent) return '';
+    const spouse = getPerson(persons, parent.spouseId);
+    const father = parent.gender === 'male' ? parent : (spouse?.gender === 'male' ? spouse : null);
+    return father ? father.firstName : (parent.lastName || '');
+  };
+
+  // Naming convention: a wife takes her husband's first name as surname; a husband who
+  // marries in keeps his own. So default a new spouse of a male person to a wife whose
+  // surname is his first name; a new spouse of a female person defaults to a husband.
+  const spouseDefaultFor = (personId) => {
+    const person = getPerson(persons, personId);
+    if (!person) return {};
+    if (person.gender === 'male') return { gender: 'female', lastName: person.firstName };
+    return { gender: 'male' };
+  };
 
   // The relationship badge is measured against an explicitly-set root if there is one,
   // otherwise "me"; when neither exists there's no anchor and the badge is hidden.
@@ -495,10 +529,12 @@ export default function App() {
             locateId={locateRequest.id}
             locateNonce={locateRequest.nonce}
             meId={meId}
+            onFocus={handleFocusPerson}
             onSelect={handleSelect}
             onToggle={toggleCollapse}
             onQuickAdd={handleQuickAdd}
             onJumpTo={handleJumpToFamily}
+            onLocateNotFound={handleLocateNotFound}
           />
         ) : Object.keys(persons).length === 0 ? (
           <div className="app-empty-state">
@@ -529,6 +565,7 @@ export default function App() {
               onAddParent={() => setFormState({ mode: 'addParent', personId: selected.id })}
               onDelete={() => handleDelete(selected.id)}
               onSetRoot={handleSetAsRoot}
+              onViewTree={handleJumpToFamily}
               onUnlinkSpouse={handleUnlinkSpouse}
               onUnlinkParent={handleUnlinkParent}
               onUnlinkChild={handleUnlinkChild}
@@ -562,7 +599,7 @@ export default function App() {
       {formState && formState.mode === 'addChild' && (
         <PersonForm
           title="Add Child"
-          initialPerson={formState.prefill || {}}
+          initialPerson={{ lastName: childSurnameFor(formState.personId), ...(formState.prefill || {}) }}
           showMarriageDate={false}
           persons={persons}
           personId={formState.personId}
@@ -575,7 +612,7 @@ export default function App() {
       {formState && formState.mode === 'addSpouse' && (
         <PersonForm
           title="Add Spouse"
-          initialPerson={formState.prefill || {}}
+          initialPerson={{ ...spouseDefaultFor(formState.personId), ...(formState.prefill || {}) }}
           showMarriageDate
           persons={persons}
           personId={formState.personId}

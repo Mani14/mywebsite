@@ -129,9 +129,11 @@ export function useFamily() {
       const parentPair = [parentId];
       if (parent.spouseId && prev[parent.spouseId]) parentPair.push(parent.spouseId);
 
+      // Convention: a child's surname is the father's (male parent's) first name.
+      const father = parentPair.map((pid) => prev[pid]).find((p) => p && p.gender === 'male');
       const child = {
         ...createEmptyPerson(newId),
-        lastName: parent.lastName,
+        lastName: father ? father.firstName : parent.lastName,
         ...partial,
         id: newId,
         parentIds: parentPair,

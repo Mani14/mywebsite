@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { BadgeCheck, Baby, Briefcase, Cake, Crown, HeartHandshake, Mail, MapPin, PartyPopper, Pencil, Phone, Sparkles, Trash2, UserPlus, X, XCircle } from 'lucide-react';
+import { BadgeCheck, Baby, Briefcase, Cake, Crown, GitBranch, HeartHandshake, Mail, MapPin, PartyPopper, Pencil, Phone, Sparkles, Trash2, UserPlus, X, XCircle } from 'lucide-react';
 import {
   getAgeInfo,
   getChildren,
@@ -59,6 +59,7 @@ export default function PersonDetail({
   onAddParent,
   onDelete,
   onSetRoot,
+  onViewTree,
   onUnlinkSpouse,
   onUnlinkParent,
   onUnlinkChild,
@@ -174,6 +175,9 @@ export default function PersonDetail({
         )}
         {parents.length < 2 && (
           <button type="button" onClick={onAddParent}><UserPlus size={14} /> Add Parent</button>
+        )}
+        {onViewTree && (
+          <button type="button" onClick={() => onViewTree(person.id)}><GitBranch size={14} /> View Tree</button>
         )}
         {!isRoot && (
           <button type="button" onClick={onSetRoot}><Crown size={14} /> Set as Root</button>

@@ -69,7 +69,7 @@ async function shareOrDownloadFile(blob, filename, mimeType) {
 // front of the claim order, stealing a shared branch away from the real family and
 // making it vanish entirely once that tiny cluster gets excluded as a satellite.
 const FamilyTree = forwardRef(function FamilyTree(
-  { persons, rootId, priorityId, collapsed, mode = 'forest', highlightedIds, locateId, locateNonce, meId, onSelect, onToggle, onQuickAdd, onJumpTo },
+  { persons, rootId, priorityId, collapsed, mode = 'forest', highlightedIds, locateId, locateNonce, meId, onFocus, onSelect, onToggle, onQuickAdd, onJumpTo, onLocateNotFound },
   exportRef
 ) {
   const rootIds = useMemo(
@@ -216,7 +216,12 @@ const FamilyTree = forwardRef(function FamilyTree(
     const el = containerRef.current;
     if (!el || !layout.width) return;
     const node = layout.nodes.find((n) => n.person.id === locateId || n.spouse?.id === locateId);
-    if (!node) return;
+    if (!node) {
+      // The target isn't drawn in this view (e.g. a trimmed satellite person in the
+      // Full Tree) — ask App to escalate to a view where they are shown.
+      onLocateNotFound?.(locateId);
+      return;
+    }
     setZoom(1);
     setPan({ x: el.clientWidth / 2 - node.x, y: el.clientHeight / 2 - node.y - 60 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -473,6 +478,7 @@ const FamilyTree = forwardRef(function FamilyTree(
               side={sideOf(node)}
               highlightedIds={highlightedIds}
               meId={meId}
+              onFocus={onFocus}
               onSelect={onSelect}
               onToggle={onToggle}
               onQuickAdd={onQuickAdd}

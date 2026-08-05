@@ -466,6 +466,14 @@ function ordinal(n) {
   return `${n}th`;
 }
 
+// Genealogical "removed" phrasing: 1 -> "Once Removed", 2 -> "Twice Removed",
+// 3+ -> "3 Times Removed".
+function removedPhrase(n) {
+  if (n === 1) return 'Once Removed';
+  if (n === 2) return 'Twice Removed';
+  return `${n} Times Removed`;
+}
+
 // Nearest common ancestor between two people (via parentIds BFS). Returns the step
 // distances { distA, distB } from each up to that ancestor, or null if unrelated.
 function commonAncestor(persons, aId, bId) {
@@ -509,14 +517,14 @@ function bloodLabelFromDistances(distPerson, distRoot, male, female) {
       const prefix = greatPrefix(distPerson - 2);
       return male ? `${prefix}Grand-Nephew` : female ? `${prefix}Grand-Niece` : `${prefix}Grand-Nibling`;
     }
-    return `${ordinal(distRoot - 1)} Cousin, ${removed}x Removed`;
+    return `${ordinal(distRoot - 1)} Cousin, ${removedPhrase(removed)}`;
   }
   if (distPerson === 1 && distRoot === 2) return male ? 'Uncle' : female ? 'Aunt' : 'Aunt/Uncle';
   if (distPerson === 1) {
     const prefix = greatPrefix(distRoot - 2);
     return male ? `${prefix}Grand-Uncle` : female ? `${prefix}Grand-Aunt` : `${prefix}Grand-Aunt/Uncle`;
   }
-  return `${ordinal(distPerson - 1)} Cousin, ${removed}x Removed`;
+  return `${ordinal(distPerson - 1)} Cousin, ${removedPhrase(removed)}`;
 }
 
 function bloodLabel(persons, personId, rootId, male, female) {
