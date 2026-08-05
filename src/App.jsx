@@ -78,8 +78,10 @@ export default function App() {
   // the diagram's root, so changing it on every click would re-root (and reshuffle)
   // the whole tree just from opening someone's details; only explicit navigation
   // (search, jump-to-family, Set as Root) should do that there.
+  // Tapping the same already-open person again closes their panel instead of
+  // silently no-op'ing (which read as "nothing happens" on a second tap).
   const handleSelect = useCallback((id) => {
-    setSelectedId(id);
+    setSelectedId((prev) => (prev === id ? null : id));
     if (viewMode === 'forest') setFocusId(id);
   }, [viewMode]);
 
@@ -87,10 +89,17 @@ export default function App() {
   // their details — tapping the already-focused node is what opens the panel.
   // If someone else's panel is already open, moving focus away closes it too, so
   // the panel never keeps showing a person other than the one now highlighted.
+  // In Pedigree View, focus IS the diagram's root (see handleSelect above), so a
+  // plain tap on anyone else must open their panel directly instead of re-rooting
+  // the whole diagram out from under whatever the user was just looking at.
   const handleFocusPerson = useCallback((id) => {
+    if (viewMode === 'pedigree') {
+      setSelectedId(id);
+      return;
+    }
     setFocusId(id);
     setSelectedId((prev) => (prev !== null && prev !== id ? null : prev));
-  }, []);
+  }, [viewMode]);
 
   // "Jump to their family" (the blue arrow on anyone married in who has their own
   // recorded parents) opens a dedicated Pedigree View centred on THAT person,
