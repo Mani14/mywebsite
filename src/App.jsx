@@ -85,8 +85,11 @@ export default function App() {
 
   // A tree-node's first tap just focuses the person (yellow ring) without opening
   // their details — tapping the already-focused node is what opens the panel.
+  // If someone else's panel is already open, moving focus away closes it too, so
+  // the panel never keeps showing a person other than the one now highlighted.
   const handleFocusPerson = useCallback((id) => {
     setFocusId(id);
+    setSelectedId((prev) => (prev !== null && prev !== id ? null : prev));
   }, []);
 
   // "Jump to their family" (the blue arrow on anyone married in who has their own
