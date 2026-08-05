@@ -124,6 +124,10 @@ body,
   /* Any stray overflow (e.g. a header row that doesn't quite fit) must never cause
      the whole page to scroll sideways on a phone — that's what made mobile feel broken. */
   overflow-x: hidden;
+  /* iOS Safari rubber-bands (bounces) the whole page when you drag past an edge —
+     without this, panning the tree canvas near its edge visibly yanks the entire
+     app up/down along with it. */
+  overscroll-behavior: none;
 }
 
 /* Mobile browsers resize their address/tab bar in and out as you scroll, and plain
@@ -154,6 +158,15 @@ body {
 button,
 [role='button'] {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS's long-press text-selection callout (copy/lookup menu) fires mid-drag on the
+   tree canvas and its cards, hijacking what should be a pan gesture. */
+.tree-canvas,
+.tree-canvas * {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Visible keyboard-focus ring on every interactive element, app-wide */
