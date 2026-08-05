@@ -35,6 +35,24 @@
 
 .login-google-btn {
   margin-top: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--duration-fast) var(--ease), transform var(--duration-fast) var(--ease);
+}
+
+.login-google-btn:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
 }
 
 .login-error {

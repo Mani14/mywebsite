@@ -1,26 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 import seedData from '../data/family.json';
-import { createEmptyPerson, generateId, validateFamilyData } from '../utils/familyUtils';
+import { createEmptyPerson, generateId } from '../utils/familyUtils';
 
-const STORAGE_KEY = 'family-hierarchy-data';
-
-// --- Persistence layer (the ONLY place that touches storage) ---
-// In V2 these two functions are swapped for cloud API calls; nothing else changes.
-function loadFromStorage() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    const { valid } = validateFamilyData(parsed);
-    return valid ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveToStorage(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
+// The whole tree lives in ONE shared Firestore document, so every signed-in device
+// reads/writes the same data in real time. localStorage is no longer the store — the
+// Firestore SDK's own offline cache keeps things working without a connection.
+const FAMILY_DOC = ['families', 'main'];
 
 // Deep clone so callers never mutate React state directly.
 function clone(value) {
@@ -30,8 +18,10 @@ function clone(value) {
 export function useFamily() {
   const [persons, setPersons] = useState({});
   const [rootPersonId, setRootPersonId] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState('idle'); // 'idle' | 'saved'
-  const isFirstLoad = useRef(true);
+  const [authed, setAuthed] = useState(() => !!auth.currentUser);
+  const lastSyncedJson = useRef(null);
   const saveTimer = useRef(null);
 
   // Kept in sync so history snapshots always capture the true current state,
@@ -53,26 +43,48 @@ export function useFamily() {
   }, []);
 
   // Load once: prefer stored data, fall back to bundled seed.
-  useEffect(() => {
-    const stored = loadFromStorage();
-    const source = stored || seedData;
-    setPersons(clone(source.persons));
-    setRootPersonId(source.rootPersonId || Object.keys(source.persons)[0] || null);
-  }, []);
+  useEffect(() => onAuthStateChanged(auth, (u) => setAuthed(!!u)), []);
 
-  // Persist on every change (skip the initial mount).
+  // Live subscription to the shared family document (starts once signed in).
   useEffect(() => {
-    if (isFirstLoad.current) {
-      isFirstLoad.current = false;
-      return;
-    }
-    if (!rootPersonId) return;
-    saveToStorage({ rootPersonId, persons });
-    setSaveState('saved');
+    if (!authed) return undefined;
+    const ref = doc(db, ...FAMILY_DOC);
+    return onSnapshot(
+      ref,
+      (snap) => {
+        if (!snap.exists()) {
+          // First-ever load: seed the shared doc from the bundled data.
+          setDoc(ref, clone(seedData)).catch(() => {});
+          return;
+        }
+        if (snap.metadata.hasPendingWrites) return; // ignore our own optimistic echo
+        const data = snap.data();
+        lastSyncedJson.current = JSON.stringify({ rootPersonId: data.rootPersonId ?? null, persons: data.persons || {} });
+        setPersons(data.persons || {});
+        setRootPersonId(data.rootPersonId || Object.keys(data.persons || {})[0] || null);
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
+  }, [authed]);
+
+  // Debounced write of local edits back to the shared doc (skips no-op / remote echoes).
+  useEffect(() => {
+    if (loading || !authed || !rootPersonId) return undefined;
+    const json = JSON.stringify({ rootPersonId, persons });
+    if (json === lastSyncedJson.current) return undefined;
     clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => setSaveState('idle'), 1500);
+    saveTimer.current = setTimeout(() => {
+      lastSyncedJson.current = json;
+      setDoc(doc(db, ...FAMILY_DOC), { rootPersonId, persons })
+        .then(() => {
+          setSaveState('saved');
+          setTimeout(() => setSaveState('idle'), 1500);
+        })
+        .catch(() => {});
+    }, 700);
     return () => clearTimeout(saveTimer.current);
-  }, [persons, rootPersonId]);
+  }, [persons, rootPersonId, loading, authed]);
 
   const addPerson = useCallback((partial) => {
     let newId;
@@ -410,6 +422,7 @@ export function useFamily() {
   return {
     persons,
     rootPersonId,
+    loading,
     saveState,
     addPerson,
     updatePerson,

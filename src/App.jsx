@@ -24,6 +24,7 @@ export default function App() {
   const {
     persons,
     rootPersonId,
+    loading,
     setRoot,
     saveState,
     addPerson,
@@ -38,14 +39,13 @@ export default function App() {
     removeParent,
     removeChild,
     replaceAll,
-    resetToSeed,
     exportData,
     undo,
     redo,
     canUndo,
     canRedo,
   } = useFamily();
-  const { user, signOut, gsiReady, clientId, meId, setMe } = useAuth();
+  const { user, authReady, signIn, signOut, meId, setMe } = useAuth();
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [selectedId, setSelectedId] = useState(null);
   const [focusId, setFocusId] = useState(null);
@@ -329,17 +329,6 @@ export default function App() {
     setCollapsed(new Set());
   }, [replaceAll]);
 
-  // Restores the latest published tree (family.json), discarding local-only edits on
-  // this device — the escape hatch for browsers still showing stale cached data.
-  const handleRefreshData = useCallback(() => {
-    if (!window.confirm('Refresh to the latest published family data? This replaces the tree on this device and discards local changes.')) return;
-    resetToSeed();
-    setSelectedId(null);
-    setFocusId(null);
-    setCollapsed(new Set());
-    setViewMode('forest');
-  }, [resetToSeed]);
-
   const selected = getPerson(persons, selectedId);
   const isAlreadyRoot = selectedId === rootPersonId;
   const focusedPerson = getPerson(persons, focusId || rootPersonId);
@@ -401,7 +390,9 @@ export default function App() {
     treeRef.current?.exportPDF();
   }, []);
 
-  if (!user) return <Login gsiReady={gsiReady} clientId={clientId} />;
+  if (!authReady) return <div className="app-loading">Loading…</div>;
+  if (!user) return <Login onSignIn={signIn} />;
+  if (loading) return <div className="app-loading">Loading family tree…</div>;
 
   return (
     <div className="app">
@@ -465,7 +456,6 @@ export default function App() {
           <ImportExport
             exportData={exportData}
             onImport={handleImport}
-            onRefresh={handleRefreshData}
             onExportImage={handleExportImage}
             onExportPDF={handleExportPDF}
           />
