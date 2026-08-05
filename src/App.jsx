@@ -110,18 +110,28 @@ export default function App() {
 
   // Links a person as "me" and, if they're missing a photo/email, backfills those
   // from the signed-in Google account — never overwrites data that's already there.
+  // Also stamps `verifiedEmail` (the linked Google account) so "verified profiles" can
+  // be counted in stats — distinct from the freely-editable `email` field, and cleared
+  // again if the link is removed.
   const handleSetMe = useCallback((personId) => {
+    const previousMeId = meId;
     setMe(personId);
-    if (!personId) return;
+    if (!personId) {
+      if (previousMeId && persons[previousMeId]?.verifiedEmail) {
+        updatePerson(previousMeId, { verifiedEmail: null });
+      }
+      return;
+    }
     const existing = persons[personId];
     const updates = {};
     if (!existing?.photo && user?.picture) updates.photo = user.picture;
     if (!existing?.email && user?.email) updates.email = user.email;
+    if (user?.email && existing?.verifiedEmail !== user.email) updates.verifiedEmail = user.email;
     if (Object.keys(updates).length > 0) updatePerson(personId, updates);
-  }, [setMe, persons, user, updatePerson]);
+  }, [setMe, persons, user, updatePerson, meId]);
 
-  // Backfills photo/email for people already linked as "me" before this sync existed —
-  // runs once per sign-in/data-load rather than only at the moment of linking.
+  // Backfills photo/email/verifiedEmail for people already linked as "me" before this
+  // sync existed — runs once per sign-in/data-load rather than only at the moment of linking.
   useEffect(() => {
     if (!meId || !user) return;
     const existing = persons[meId];
@@ -129,6 +139,7 @@ export default function App() {
     const updates = {};
     if (!existing.photo && user.picture) updates.photo = user.picture;
     if (!existing.email && user.email) updates.email = user.email;
+    if (user.email && existing.verifiedEmail !== user.email) updates.verifiedEmail = user.email;
     if (Object.keys(updates).length > 0) updatePerson(meId, updates);
   }, [meId, user, persons, updatePerson]);
 

@@ -734,6 +734,7 @@ export function computeFamilyStats(persons) {
   const lastNameCounts = new Map();
   const countedCouples = new Set();
   let marriedCouples = 0;
+  let verifiedProfiles = 0;
 
   all.forEach((p) => {
     if (p.gender === 'male') males += 1;
@@ -742,6 +743,8 @@ export function computeFamilyStats(persons) {
 
     if (p.isAlive) alive += 1;
     else deceased += 1;
+
+    if (p.verifiedEmail) verifiedProfiles += 1;
 
     if (!p.isAlive) {
       const age = getAgeInfo(p);
@@ -781,6 +784,7 @@ export function computeFamilyStats(persons) {
     deceased,
     avgLifespanYears: lifespanCount ? Math.round((lifespanSum / lifespanCount) * 10) / 10 : null,
     avgLifespanSampleSize: lifespanCount,
+    verifiedProfiles,
     generationCount,
     topLocations: topN(locationCounts),
     topLastNames: topN(lastNameCounts),

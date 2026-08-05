@@ -33,12 +33,8 @@ export default function StatsPanel({ persons, isOpen, onClose }) {
             <span className="stats-panel-label">Deceased</span>
           </div>
           <div className="stats-panel-card">
-            <span className="stats-panel-value">
-              {stats.avgLifespanYears != null ? stats.avgLifespanYears : '—'}
-            </span>
-            <span className="stats-panel-label">
-              Avg lifespan (yrs){stats.avgLifespanSampleSize ? ` · n=${stats.avgLifespanSampleSize}` : ''}
-            </span>
+            <span className="stats-panel-value">{stats.verifiedProfiles}</span>
+            <span className="stats-panel-label">Verified profiles</span>
           </div>
         </div>
 

@@ -22,9 +22,9 @@ export default function StatsBar({ persons, onOpenDetails }) {
       <span className="stats-bar-item">
         <strong>{stats.marriedCouples}</strong> couple{stats.marriedCouples === 1 ? '' : 's'}
       </span>
-      {stats.avgLifespanYears != null && (
+      {stats.verifiedProfiles > 0 && (
         <span className="stats-bar-item">
-          avg lifespan <strong>{stats.avgLifespanYears}</strong> yrs
+          <strong>{stats.verifiedProfiles}</strong> verified profile{stats.verifiedProfiles === 1 ? '' : 's'}
         </span>
       )}
       <button type="button" className="stats-bar-link" onClick={onOpenDetails}>
