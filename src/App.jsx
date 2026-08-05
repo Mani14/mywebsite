@@ -38,6 +38,7 @@ export default function App() {
     removeParent,
     removeChild,
     replaceAll,
+    resetToSeed,
     exportData,
     undo,
     redo,
@@ -324,6 +325,17 @@ export default function App() {
     setCollapsed(new Set());
   }, [replaceAll]);
 
+  // Restores the latest published tree (family.json), discarding local-only edits on
+  // this device — the escape hatch for browsers still showing stale cached data.
+  const handleRefreshData = useCallback(() => {
+    if (!window.confirm('Refresh to the latest published family data? This replaces the tree on this device and discards local changes.')) return;
+    resetToSeed();
+    setSelectedId(null);
+    setFocusId(null);
+    setCollapsed(new Set());
+    setViewMode('forest');
+  }, [resetToSeed]);
+
   const selected = getPerson(persons, selectedId);
   const isAlreadyRoot = selectedId === rootPersonId;
   const focusedPerson = getPerson(persons, focusId || rootPersonId);
@@ -449,6 +461,7 @@ export default function App() {
           <ImportExport
             exportData={exportData}
             onImport={handleImport}
+            onRefresh={handleRefreshData}
             onExportImage={handleExportImage}
             onExportPDF={handleExportPDF}
           />

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, Download, FileImage, FileText, Upload } from 'lucide-react';
+import { ChevronDown, Download, FileImage, FileText, RefreshCw, Upload } from 'lucide-react';
 import { validateFamilyData } from '../utils/familyUtils';
 import '../styles/ImportExport.css';
 
-export default function ImportExport({ exportData, onImport, onExportImage, onExportPDF }) {
+export default function ImportExport({ exportData, onImport, onRefresh, onExportImage, onExportPDF }) {
   const fileInputRef = useRef(null);
   const menuRef = useRef(null);
   const [error, setError] = useState('');
@@ -95,6 +95,11 @@ export default function ImportExport({ exportData, onImport, onExportImage, onEx
             <button type="button" role="menuitem" onClick={handleImportClick}>
               <Upload size={15} /> Import JSON
             </button>
+            {onRefresh && (
+              <button type="button" role="menuitem" onClick={() => { onRefresh(); setOpen(false); }}>
+                <RefreshCw size={15} /> Refresh Data
+              </button>
+            )}
             {onExportImage && (
               <button type="button" role="menuitem" onClick={() => { onExportImage(); setOpen(false); }}>
                 <FileImage size={15} /> Export Image

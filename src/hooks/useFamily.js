@@ -381,6 +381,11 @@ export function useFamily() {
     setRootPersonId(data.rootPersonId || Object.keys(data.persons)[0] || null);
   }, [pushHistory]);
 
+  // Restores the published seed (family.json), discarding local-only edits. Undoable.
+  const resetToSeed = useCallback(() => {
+    replaceAll(seedData);
+  }, [replaceAll]);
+
   const exportData = useCallback(() => clone({ rootPersonId, persons }), [rootPersonId, persons]);
 
   // past/future are read directly off the ref (not state) — every push/pop
@@ -419,6 +424,7 @@ export function useFamily() {
     removeChild,
     setRoot,
     replaceAll,
+    resetToSeed,
     exportData,
     undo,
     redo,
