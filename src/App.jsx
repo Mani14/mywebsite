@@ -53,6 +53,9 @@ export default function App() {
   const [highlightedChain, setHighlightedChain] = useState([]); // ordered ids from a person up to their root, or [] if none
   const [showStatsPanel, setShowStatsPanel] = useState(false);
   const [showAttachWizard, setShowAttachWizard] = useState(false);
+  // A locate request { id, nonce }: the nonce bumps on every Locate so FamilyTree
+  // re-centres even when locating the same person twice or the current root.
+  const [locateRequest, setLocateRequest] = useState({ id: null, nonce: 0 });
   // Person the relationship badge is measured against — set only by explicit "Set as
   // Root"; falls back to "me" so relationships read relative to you by default.
   const [explicitRootId, setExplicitRootId] = useState(null);
@@ -289,10 +292,13 @@ export default function App() {
 
   // Locate (search single-click, and the "Locate Me" pill) centres/highlights a
   // person WITHOUT opening their detail panel — deliberately no setSelectedId.
+  // The bumping nonce forces FamilyTree to re-centre even when the target is already
+  // the current focus/root (otherwise its rootId-keyed centring effect wouldn't fire).
   const handleLocatePerson = useCallback((id) => {
     revealAncestors(id);
     setFocusId(id);
     setHighlightedChain([id]);
+    setLocateRequest((prev) => ({ id, nonce: prev.nonce + 1 }));
   }, [revealAncestors]);
 
   // Import replaces the whole dataset, then re-syncs any open selection/focus.
@@ -486,6 +492,8 @@ export default function App() {
             collapsed={collapsed}
             mode={viewMode}
             highlightedIds={highlightedIds}
+            locateId={locateRequest.id}
+            locateNonce={locateRequest.nonce}
             meId={meId}
             onSelect={handleSelect}
             onToggle={toggleCollapse}

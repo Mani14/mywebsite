@@ -69,7 +69,7 @@ async function shareOrDownloadFile(blob, filename, mimeType) {
 // front of the claim order, stealing a shared branch away from the real family and
 // making it vanish entirely once that tiny cluster gets excluded as a satellite.
 const FamilyTree = forwardRef(function FamilyTree(
-  { persons, rootId, priorityId, collapsed, mode = 'forest', highlightedIds, meId, onSelect, onToggle, onQuickAdd, onJumpTo },
+  { persons, rootId, priorityId, collapsed, mode = 'forest', highlightedIds, locateId, locateNonce, meId, onSelect, onToggle, onQuickAdd, onJumpTo },
   exportRef
 ) {
   const rootIds = useMemo(
@@ -207,6 +207,20 @@ const FamilyTree = forwardRef(function FamilyTree(
       didCenter.current = true;
     }
   }, [layout.width, centerTree]);
+
+  // Force-centre on an explicit Locate request (search click / Locate Me). Keyed on the
+  // bumping nonce so it fires every time — including when the target is already rootId,
+  // where the rootId-change effect above stays silent and nothing would otherwise move.
+  useEffect(() => {
+    if (!locateNonce || !locateId) return;
+    const el = containerRef.current;
+    if (!el || !layout.width) return;
+    const node = layout.nodes.find((n) => n.person.id === locateId || n.spouse?.id === locateId);
+    if (!node) return;
+    setZoom(1);
+    setPan({ x: el.clientWidth / 2 - node.x, y: el.clientHeight / 2 - node.y - 60 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locateNonce]);
 
   // Changes zoom while keeping the world point under (anchorX, anchorY) — a
   // viewport-relative pixel coordinate — visually fixed in place. `.tree-world`'s
