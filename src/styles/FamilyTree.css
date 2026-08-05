@@ -204,8 +204,8 @@
 }
 .avatar-female {
   --halo-rgb: var(--color-female-rgb);
-  background: linear-gradient(145deg, #eebf8d, var(--color-female));
-  border-color: var(--color-female-ring, #e08b2f);
+  background: linear-gradient(145deg, #f2b2d3, var(--color-female));
+  border-color: var(--color-female-ring, #a83370);
 }
 .avatar-other {
   --halo-rgb: var(--color-other-rgb);
