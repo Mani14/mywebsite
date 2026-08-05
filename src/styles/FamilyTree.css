@@ -8,6 +8,13 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
+  /* `clip` (unlike `hidden`) is not a scroll container per spec, so a mini-card
+     button receiving focus on tap can't make the browser auto-scroll this element
+     to bring it into view — that native auto-scroll was fighting our own
+     transform-based pan and is what caused taps to jerk the whole canvas around
+     ("position moving wildly"). Falls back to `hidden` above in browsers that
+     don't support the value. */
+  overflow: clip;
   cursor: grab;
   /* Hands single-finger drag/pan entirely to our pointer-event handlers instead of
      letting the browser try to scroll/refresh the page — without this, panning the

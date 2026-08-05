@@ -167,6 +167,30 @@ const FamilyTree = forwardRef(function FamilyTree(
     return () => ro.disconnect();
   }, []);
 
+  // `.tree-canvas` should never natively scroll — panning is done entirely via the
+  // `.tree-world` transform below. The CSS `overflow: clip` on `.tree-canvas`
+  // (FamilyTree.css) is the real fix for this: unlike `hidden`, `clip` isn't a
+  // scroll container per spec, so focusing a mini-card <button> on tap can't make
+  // the browser auto-scroll it into view — that native auto-scroll was fighting
+  // the transform pan and is what caused taps to jerk the whole canvas around
+  // unpredictably ("position moving wildly"). This listener is only a fallback for
+  // browsers old enough to not support `overflow: clip` (where the CSS falls back
+  // to `hidden`, which IS a scroll container): it reacts to the 'scroll' event
+  // (fired asynchronously, after the native scroll already happened) and snaps the
+  // offset back to 0 — better than nothing there, but not race-free like `clip` is.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return undefined;
+    const resetScroll = () => {
+      if (el.scrollLeft !== 0 || el.scrollTop !== 0) {
+        el.scrollLeft = 0;
+        el.scrollTop = 0;
+      }
+    };
+    el.addEventListener('scroll', resetScroll);
+    return () => el.removeEventListener('scroll', resetScroll);
+  }, []);
+
   // Centres the viewport on the focus person's node (falls back to tree centre).
   const centerTree = useCallback(() => {
     const el = containerRef.current;
