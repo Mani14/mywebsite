@@ -377,12 +377,12 @@
   transition: transform var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
-/* Invisible ~48px hit zone so the small arrow is reliably tappable on touch screens
-   (taps near it open the tree page instead of landing on the card behind it). */
+/* Slightly larger than the 24px button so it's reliably tappable, without reaching
+   far enough into the avatar to steal taps meant for the initials/photo behind it. */
 .mini-card-jump::before {
   content: '';
   position: absolute;
-  inset: -12px;
+  inset: -4px;
   border-radius: 50%;
 }
 
