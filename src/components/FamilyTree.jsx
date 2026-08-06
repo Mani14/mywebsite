@@ -1,12 +1,72 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { NODE_W, COUPLE_GAP, useForestLayout, usePedigreeLayout } from '../hooks/useTreeLayout';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { NODE_H, NODE_W, COUPLE_GAP, useForestLayout, usePedigreeLayout } from '../hooks/useTreeLayout';
 import { getForestRoots, getLineageRootIds } from '../utils/familyUtils';
 import ConnectorLines from './ConnectorLines';
+import MiniMap from './MiniMap';
 import TreeNode from './TreeNode';
 import '../styles/FamilyTree.css';
 
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 2;
+
+// `.tree-world` has no intrinsic size of its own (all its children are absolutely
+// positioned) and normally sits pan/zoom-transformed inside a clipped, viewport-sized
+// `.tree-canvas` — capturing it directly would only grab whatever's currently
+// scrolled into view. This resets the transform to identity for the capture so
+// html2canvas renders the whole tree at natural scale, then restores it after.
+async function captureFullTree(html2canvas, worldEl, backgroundColor) {
+  const prevTransform = worldEl.style.transform;
+  const prevTransition = worldEl.style.transition;
+  worldEl.style.transition = 'none';
+  worldEl.style.transform = 'none';
+  try {
+    return await html2canvas(worldEl, { backgroundColor, useCORS: true });
+  } finally {
+    worldEl.style.transform = prevTransform;
+    worldEl.style.transition = prevTransition;
+  }
+}
+
+// Shares a file via the native Share Sheet when available — the reliable way to save
+// on iOS Safari, which doesn't support the anchor `download` attribute for data/blob
+// URLs — falling back to an in-DOM anchor-click download (desktop browsers) otherwise.
+async function shareOrDownloadFile(blob, filename, mimeType) {
+  const file = new File([blob], filename, { type: mimeType });
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      // Sharing failed for another reason — fall through to the download link below.
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Safari (desktop and iOS) ignores the `download` attribute for blob URLs and
+  // silently does nothing instead of downloading — open the file in a new tab so the
+  // user can save it manually (long-press > Save Image, or the PDF viewer's own
+  // share/save button).
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  if (isSafari) window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+// A node's `.x` is the COUPLE's shared centre (see useTreeLayout's place()), not
+// either individual's own avatar — offset to whichever half `targetId` actually is
+// (primary renders left, spouse renders right; see TreeNode) so a specific person's
+// own circle can be centred exactly, not the midpoint between them and their spouse.
+function individualX(node, targetId) {
+  if (!node.spouse) return node.x;
+  const isSpouseSide = node.spouse.id === targetId && node.person.id !== targetId;
+  const HALF_COUPLE_OFFSET = (NODE_W + COUPLE_GAP) / 2;
+  return node.x + (isSpouseSide ? HALF_COUPLE_OFFSET : -HALF_COUPLE_OFFSET);
+}
 
 // Renders either every family in the dataset side by side (mode="forest", not just
 // the one connected to the focus person) or one person's ancestors-above +
@@ -19,24 +79,10 @@ const MAX_ZOOM = 2;
 // whose lineage traces to a tiny satellite cluster would shove that cluster to the
 // front of the claim order, stealing a shared branch away from the real family and
 // making it vanish entirely once that tiny cluster gets excluded as a satellite.
-export default function FamilyTree({
-  persons,
-  rootId,
-  priorityId,
-  collapsed,
-  mode = 'forest',
-  highlightedIds,
-  locateId,
-  locateNonce,
-  locatedId,
-  meId,
-  onFocus,
-  onSelect,
-  onToggle,
-  onQuickAdd,
-  onJumpTo,
-  onLocateNotFound,
-}) {
+const FamilyTree = forwardRef(function FamilyTree(
+  { persons, rootId, priorityId, collapsed, mode = 'forest', highlightedIds, locateId, locateNonce, locatedId, meId, onFocus, onSelect, onToggle, onQuickAdd, onJumpTo, onLocateNotFound },
+  exportRef
+) {
   const rootIds = useMemo(
     () => getForestRoots(persons, priorityId ?? rootId),
     [persons, priorityId, rootId]
@@ -53,6 +99,25 @@ export default function FamilyTree({
     [layout]
   );
 
+  // Every "parentId|childId" pair where both ends are on the highlighted
+  // lineage-to-root chain — handed to ConnectorLines so it can draw that
+  // specific run of connectors a second time, in the highlight colour.
+  // A couple's connector is always anchored to whichever spouse the layout used
+  // as its placement id, which isn't necessarily the one getAncestorChain walked
+  // through (parentIds[0]) — so a link also counts as highlighted when its
+  // parentId's SPOUSE is the chain member, not just an exact id match.
+  const highlightedPairs = useMemo(() => {
+    if (!highlightedIds?.size) return null;
+    const pairs = new Set();
+    layout.links.forEach(({ parentId, childId }) => {
+      if (!parentId || !childId || !highlightedIds.has(childId)) return;
+      const parentOnChain =
+        highlightedIds.has(parentId) || highlightedIds.has(persons[parentId]?.spouseId);
+      if (parentOnChain) pairs.add(`${parentId}|${childId}`);
+    });
+    return pairs;
+  }, [layout.links, highlightedIds, persons]);
+
   // Dad-side/mom-side highlighting: whichever two lineage trees are the current
   // focus person's father's and mother's, tinted so their halves of the diagram
   // (or, in Full Tree View, just their two trees among everyone else's) stand out.
@@ -68,18 +133,30 @@ export default function FamilyTree({
   );
 
   const containerRef = useRef(null);
+  const worldRef = useRef(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 40 });
   const drag = useRef(null);
-  // Every currently-down pointer, keyed by pointerId — lets us tell a one-finger pan
-  // apart from a two-finger pinch (iOS/touch devices send both through Pointer
-  // Events, never wheel events, so pinch has to be reconstructed from raw touches).
+  // Every currently-active touch/pointer on the canvas, keyed by pointerId — needed
+  // (instead of just `drag`) to detect a second finger landing for pinch-to-zoom, and
+  // to keep tracking positions even for a pointer that started on a card/button (see
+  // onMouseDown below) so it still counts if a second finger joins it mid-tap.
   const pointers = useRef(new Map());
-  const pinchDist = useRef(null);
+  // Pinch-zoom baseline captured the moment a 2nd finger touches down: the starting
+  // finger-to-finger distance and zoom level, so the live ratio between the current
+  // and starting distance can be applied as a multiplier — re-baselined every time a
+  // finger lifts (see endDrag) so releasing one finger never snaps the zoom.
+  const pinch = useRef(null);
   const didCenter = useRef(false);
-  // Gates the CSS transition below — on while zooming (buttons/wheel) so the jump
+  // Gates the CSS transition below — on while zooming via the +/- buttons so the jump
   // eases in smoothly, off while drag-panning so the tree tracks the cursor instantly.
   const [isDragging, setIsDragging] = useState(false);
+  // Also off while wheel/trackpad-zooming: a wheel burst fires many ticks per second,
+  // and re-triggering the 220ms ease on every tick made the view visibly lag ~250ms
+  // behind the input (each new tick restarts the ease from the current in-flight
+  // position toward a new target). Wheel zoom instead tracks 1:1, like dragging.
+  const [isWheeling, setIsWheeling] = useState(false);
+  const wheelTimeoutRef = useRef(null);
   // Mirrors `zoom` for synchronous reads inside zoomAt/handleWheel/zoomBy, since those
   // need the up-to-date value without waiting for a re-render (state setter callbacks
   // firing back-to-back, e.g. rapid wheel events, would otherwise read a stale `zoom`).
@@ -88,22 +165,51 @@ export default function FamilyTree({
     zoomRef.current = zoom;
   }, [zoom]);
 
+  // Tracked purely for the mini-map, so its viewport rectangle stays accurate
+  // across window/panel resizes without the main pan/zoom logic depending on it.
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return undefined;
+    const update = () => setViewportSize({ width: el.clientWidth, height: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // `.tree-canvas` should never natively scroll — panning is done entirely via the
+  // `.tree-world` transform below. The CSS `overflow: clip` on `.tree-canvas`
+  // (FamilyTree.css) is the real fix for this: unlike `hidden`, `clip` isn't a
+  // scroll container per spec, so focusing a mini-card <button> on tap can't make
+  // the browser auto-scroll it into view — that native auto-scroll was fighting
+  // the transform pan and is what caused taps to jerk the whole canvas around
+  // unpredictably ("position moving wildly"). This listener is only a fallback for
+  // browsers old enough to not support `overflow: clip` (where the CSS falls back
+  // to `hidden`, which IS a scroll container): it reacts to the 'scroll' event
+  // (fired asynchronously, after the native scroll already happened) and snaps the
+  // offset back to 0 — better than nothing there, but not race-free like `clip` is.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return undefined;
+    const resetScroll = () => {
+      if (el.scrollLeft !== 0 || el.scrollTop !== 0) {
+        el.scrollLeft = 0;
+        el.scrollTop = 0;
+      }
+    };
+    el.addEventListener('scroll', resetScroll);
+    return () => el.removeEventListener('scroll', resetScroll);
+  }, []);
+
   // Centres the viewport on the focus person's node (falls back to tree centre).
   const centerTree = useCallback(() => {
     const el = containerRef.current;
     if (!el || !layout.width) return;
     const focusNode = layout.nodes.find((n) => n.person.id === rootId || n.spouse?.id === rootId);
     if (focusNode) {
-      // focusNode.x is the COUPLE's shared centre (see useTreeLayout's place()),
-      // not either individual's own avatar — offset to whichever half rootId
-      // actually is (primary renders left, spouse renders right; see TreeNode) so
-      // the focused/logged-in person's own circle lands at screen-centre, not the
-      // midpoint between them and their spouse.
-      const isSpouseSide = focusNode.spouse?.id === rootId && focusNode.person.id !== rootId;
-      const HALF_COUPLE_OFFSET = (NODE_W + COUPLE_GAP) / 2;
-      const focusX = focusNode.spouse ? focusNode.x + (isSpouseSide ? HALF_COUPLE_OFFSET : -HALF_COUPLE_OFFSET) : focusNode.x;
       setPan({
-        x: el.clientWidth / 2 - focusX,
+        x: el.clientWidth / 2 - individualX(focusNode, rootId),
         y: el.clientHeight / 2 - focusNode.y - 60,
       });
     } else {
@@ -111,17 +217,17 @@ export default function FamilyTree({
     }
   }, [layout, rootId]);
 
-  // Re-centre when the focus person changes — but only in Pedigree View, where rootId
-  // IS the diagram's root, so changing it reshapes the whole thing (e.g. after "Set as
-  // Root"). In Full Tree View every tree is already laid out regardless of who's
-  // focused, so a plain click just moves the gold ring in place; the view should stay
-  // anchored where the user left it, not jump to re-centre on whoever they tapped.
-  // (Zoom reset rationale, when this DOES fire: a level carried over from whatever was
-  // previously on screen — a different person's Pedigree View, or a zoomed-out Full
-  // Tree View — breaks the auto-centring math for the new layout, since centerTree()'s
-  // pan formula assumes zoom 1; at any other zoom the computed pan lands the content
-  // off-screen until "reset view" is clicked, which resets zoom AND pan together,
-  // masking the bug.)
+  // Re-centre when the *pedigree* root changes (e.g. "Jump to their family" from one
+  // lineage to another while already in Pedigree View), and reset zoom back to 1 at
+  // the same time. Without the zoom reset, a level carried over from whatever was
+  // previously on screen breaks the auto-centring math for the new layout:
+  // centerTree()'s pan formula assumes zoom 1, so at any other zoom the computed pan
+  // lands the content off-screen — it looks blank until "reset view" is clicked
+  // (which resets zoom AND pan together, masking the bug). Gated to Pedigree View
+  // only: that's the one mode where rootId actually reshapes the layout (forestLayout
+  // is keyed on priorityId, not rootId) — in Forest View, rootId only changes from
+  // plain focus/select taps as you browse around, and re-centring the camera on every
+  // tap made the view jump wildly instead of staying put.
   useEffect(() => {
     if (mode !== 'pedigree') return;
     didCenter.current = false;
@@ -133,16 +239,6 @@ export default function FamilyTree({
     setZoom(1);
   }, [mode]);
 
-  // A locate request (search single-click, "Locate Me") bumps `locateNonce` even when
-  // the target is already the current focus/root — the rootId-keyed effect above
-  // wouldn't fire in that case, so this re-arms centring independently, with the same
-  // zoom reset (see the comment above) to avoid the same blank-canvas bug.
-  useEffect(() => {
-    if (!locateNonce) return;
-    didCenter.current = false;
-    setZoom(1);
-  }, [locateNonce]);
-
   useEffect(() => {
     if (!didCenter.current && layout.width) {
       centerTree();
@@ -150,14 +246,24 @@ export default function FamilyTree({
     }
   }, [layout.width, centerTree]);
 
-  // If the located person isn't actually drawn on this canvas (e.g. trimmed as a
-  // satellite in Full Tree View), tell the caller so it can switch to a view that
-  // does render them (Pedigree View) instead of silently centring on nothing.
+  // Force-centre on an explicit Locate request (search click / Locate Me). Keyed on the
+  // bumping nonce so it fires every time — including when the target is already rootId,
+  // where the rootId-change effect above stays silent and nothing would otherwise move.
   useEffect(() => {
-    if (!locateId || !locateNonce) return;
-    const found = layout.nodes.some((n) => n.person.id === locateId || n.spouse?.id === locateId);
-    if (!found) onLocateNotFound?.(locateId);
-  }, [locateId, locateNonce, layout, onLocateNotFound]);
+    if (!locateNonce || !locateId) return;
+    const el = containerRef.current;
+    if (!el || !layout.width) return;
+    const node = layout.nodes.find((n) => n.person.id === locateId || n.spouse?.id === locateId);
+    if (!node) {
+      // The target isn't drawn in this view (e.g. a trimmed satellite person in the
+      // Full Tree) — ask App to escalate to a view where they are shown.
+      onLocateNotFound?.(locateId);
+      return;
+    }
+    setZoom(1);
+    setPan({ x: el.clientWidth / 2 - individualX(node, locateId), y: el.clientHeight / 2 - node.y - 60 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locateNonce]);
 
   // Changes zoom while keeping the world point under (anchorX, anchorY) — a
   // viewport-relative pixel coordinate — visually fixed in place. `.tree-world`'s
@@ -187,81 +293,128 @@ export default function FamilyTree({
       // Anchor on the viewport centre (not the cursor) so wheel zoom matches the
       // +/- buttons and always zooms toward what's currently in the middle of the screen.
       zoomAt(el.clientWidth / 2, el.clientHeight / 2, next);
+      setIsWheeling(true);
+      clearTimeout(wheelTimeoutRef.current);
+      wheelTimeoutRef.current = setTimeout(() => setIsWheeling(false), 150);
     },
     [zoomAt]
   );
 
+  const pinchDistance = (pts) => Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  // A finger starting on a card still needs to pan if it moves — but a plain tap
+  // must reach the card's onClick, so panning only "activates" once the finger has
+  // travelled past this many px, and pointer capture is deferred until then so the
+  // browser is still free to fire a normal click for anything under it.
+  const PAN_ACTIVATE_PX = 8;
+  // Set true the moment a drag activates, read by suppressClick below — kept separate
+  // from drag.current since endDrag (pointerup) clears that before the resulting
+  // `click` event fires, so drag.current.active is already gone by the time it matters.
+  const draggedRef = useRef(false);
+
   const onMouseDown = (e) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    // Every pointer's position is tracked regardless of what it started on — a
-    // second finger has to be trackable even if it lands on a card, which on a
-    // phone screen full of cards it very often will. Only a LONE first finger
-    // starting on a card/toggle button is left alone (that's a tap: select/focus),
-    // not captured or turned into a pan — but its position is still recorded here
-    // in case a second finger joins it for a pinch.
-    const onButton = !!e.target.closest('button');
+    // Track every pointer's position regardless of what it started on — a finger
+    // resting on a card still needs to count toward a pinch gesture if a second
+    // finger comes down elsewhere.
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-    if (pointers.current.size === 2) {
-      // Two fingers down is unambiguously a pinch no matter what's underneath them.
+    if (pointers.current.size >= 2) {
+      // Two fingers down = pinch-zoom, even if one of them started on a card —
+      // capture both now and abandon any single-finger pan/tap in progress.
       drag.current = null;
-      setIsDragging(false);
-      e.currentTarget.setPointerCapture(e.pointerId);
-      const [a, b] = [...pointers.current.values()];
-      pinchDist.current = Math.hypot(a.x - b.x, a.y - b.y);
-    } else if (pointers.current.size === 1 && !onButton) {
-      e.currentTarget.setPointerCapture(e.pointerId);
-      drag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
+      pointers.current.forEach((_, id) => {
+        try {
+          e.currentTarget.setPointerCapture(id);
+        } catch {
+          // pointer may already be gone — safe to ignore
+        }
+      });
+      const pts = [...pointers.current.values()].slice(0, 2);
+      pinch.current = { startDist: pinchDistance(pts) || 1, startZoom: zoomRef.current };
       setIsDragging(true);
+      return;
     }
+
+    if (e.button !== 0) return;
+    // `active: false` until movement clears PAN_ACTIVATE_PX (see onMouseMove) — lets a
+    // tap on a card/button still register as a click instead of being hijacked as a pan.
+    drag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y, active: false };
+    draggedRef.current = false;
   };
   const onMouseMove = (e) => {
     if (!pointers.current.has(e.pointerId)) return;
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-    if (pointers.current.size === 2 && pinchDist.current) {
-      const [a, b] = [...pointers.current.values()];
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      const rect = containerRef.current?.getBoundingClientRect();
-      const midX = (a.x + b.x) / 2 - (rect?.left ?? 0);
-      const midY = (a.y + b.y) / 2 - (rect?.top ?? 0);
-      // Incremental, same pattern as handleWheel: scale the CURRENT zoom by how much
-      // the finger spacing changed since the last move, anchored on the live
-      // midpoint — reuses zoomAt so the anchor-correction math isn't duplicated.
-      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomRef.current * (dist / pinchDist.current)));
-      zoomAt(midX, midY, next);
-      pinchDist.current = dist;
+    if (pinch.current && pointers.current.size >= 2) {
+      const el = containerRef.current;
+      if (!el) return;
+      const pts = [...pointers.current.values()].slice(0, 2);
+      const rect = el.getBoundingClientRect();
+      const anchorX = (pts[0].x + pts[1].x) / 2 - rect.left;
+      const anchorY = (pts[0].y + pts[1].y) / 2 - rect.top;
+      const ratio = pinchDistance(pts) / pinch.current.startDist;
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinch.current.startZoom * ratio));
+      zoomAt(anchorX, anchorY, next);
       return;
     }
 
     if (!drag.current) return;
+    if (!drag.current.active) {
+      const moved = Math.hypot(e.clientX - drag.current.startX, e.clientY - drag.current.startY);
+      if (moved < PAN_ACTIVATE_PX) return;
+      drag.current.active = true;
+      draggedRef.current = true;
+      setIsDragging(true);
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // ignore — capture is best-effort
+      }
+    }
     setPan({
       x: drag.current.panX + (e.clientX - drag.current.startX),
       y: drag.current.panY + (e.clientY - drag.current.startY),
     });
   };
   const endDrag = (e) => {
-    if (e?.pointerId != null) pointers.current.delete(e.pointerId);
-    if (pointers.current.size < 2) pinchDist.current = null;
-
-    if (pointers.current.size === 1) {
-      // One finger lifted out of a pinch — resume single-finger panning from
-      // exactly where that finger already is, instead of jumping to it.
-      const [[, pt]] = pointers.current;
-      drag.current = { startX: pt.x, startY: pt.y, panX: pan.x, panY: pan.y };
-      setIsDragging(true);
-    } else if (pointers.current.size === 0) {
-      drag.current = null;
-      setIsDragging(false);
-    }
-
-    if (e?.currentTarget?.releasePointerCapture && e.pointerId != null) {
+    pointers.current.delete(e.pointerId);
+    if (e?.currentTarget?.releasePointerCapture && e.pointerId != null && e.currentTarget.hasPointerCapture?.(e.pointerId)) {
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {
-        // Already released (e.g. pointercancel) — nothing to do.
+        // ignore — pointer may already have been released by the browser
       }
     }
+
+    if (pointers.current.size >= 2) {
+      // Still pinching with the remaining fingers — re-baseline so lifting one
+      // finger doesn't snap the zoom to a new value.
+      const pts = [...pointers.current.values()].slice(0, 2);
+      pinch.current = { startDist: pinchDistance(pts) || 1, startZoom: zoomRef.current };
+      return;
+    }
+
+    pinch.current = null;
+
+    if (pointers.current.size === 1) {
+      // Dropped from two fingers to one — resume single-finger panning from
+      // here instead of jumping back to wherever the very first touch started.
+      const [[, pos]] = pointers.current.entries();
+      drag.current = { startX: pos.x, startY: pos.y, panX: pan.x, panY: pan.y, active: true };
+      return;
+    }
+
+    drag.current = null;
+    setIsDragging(false);
+  };
+
+  // A drag that moved past PAN_ACTIVATE_PX shouldn't also trigger whatever card/button
+  // the finger happened to end up over — otherwise panning across a person opens their
+  // detail view the moment you lift your finger.
+  const suppressClick = (e) => {
+    if (!draggedRef.current) return;
+    draggedRef.current = false;
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   // Anchored on the viewport centre so the +/- buttons zoom toward/away from whatever
@@ -288,6 +441,48 @@ export default function FamilyTree({
     centerTree();
   };
 
+  // Mini-map click/drag: re-centre the viewport on the tree-space point clicked,
+  // at whatever zoom level is currently active.
+  const handleMiniMapNavigate = useCallback((treeX, treeY) => {
+    const el = containerRef.current;
+    if (!el) return;
+    setPan({
+      x: el.clientWidth / 2 - treeX * zoomRef.current,
+      y: el.clientHeight / 2 - treeY * zoomRef.current,
+    });
+  }, []);
+
+  // Exposed to App.jsx (via ref) for the Export Image/PDF buttons — captures
+  // exactly what's currently visible in the viewport, not the whole tree, since
+  // large trees can be enormous once fully unrolled.
+  useImperativeHandle(exportRef, () => ({
+    async exportImage() {
+      try {
+        const { default: html2canvas } = await import('html2canvas');
+        const canvas = await captureFullTree(html2canvas, worldRef.current, null);
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error('Could not render the tree to an image.');
+        await shareOrDownloadFile(blob, 'family-tree.png', 'image/png');
+      } catch (err) {
+        console.error('Export Image failed:', err);
+        window.alert(`Export Image failed: ${err?.message || err}`);
+      }
+    },
+    async exportPDF() {
+      try {
+        const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
+        const canvas = await captureFullTree(html2canvas, worldRef.current, '#ffffff');
+        const orientation = canvas.width >= canvas.height ? 'landscape' : 'portrait';
+        const pdf = new jsPDF({ orientation, unit: 'px', format: [canvas.width, canvas.height] });
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+        await shareOrDownloadFile(pdf.output('blob'), 'family-tree.pdf', 'application/pdf');
+      } catch (err) {
+        console.error('Export PDF failed:', err);
+        window.alert(`Export PDF failed: ${err?.message || err}`);
+      }
+    },
+  }));
+
   return (
     <div className="tree-viewport">
       <div
@@ -298,26 +493,31 @@ export default function FamilyTree({
         onPointerMove={onMouseMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
+        onClickCapture={suppressClick}
       >
         <div
+          ref={worldRef}
           className="tree-world"
           style={{
+            width: Math.max(layout.width, 1),
+            height: Math.max(layout.height + NODE_H, 1),
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transition: isDragging ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+            transition: isDragging || isWheeling ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
-          <ConnectorLines links={layout.links} width={layout.width} height={layout.height} />
-          {layout.nodes.map((node) => (
+          <ConnectorLines links={layout.links} width={layout.width} height={layout.height} highlightedPairs={highlightedPairs} />
+          {layout.nodes.map((node, index) => (
             <TreeNode
               key={node.id}
               node={node}
+              index={index}
               focusId={rootId}
               renderedIds={renderedIds}
               side={sideOf(node)}
               highlightedIds={highlightedIds}
-              locatedId={locatedId}
               meId={meId}
               onFocus={onFocus}
+              locatedId={locatedId}
               onSelect={onSelect}
               onToggle={onToggle}
               onQuickAdd={onQuickAdd}
@@ -327,11 +527,23 @@ export default function FamilyTree({
         </div>
       </div>
 
+      <MiniMap
+        nodes={layout.nodes}
+        treeWidth={layout.width}
+        treeHeight={layout.height}
+        pan={pan}
+        zoom={zoom}
+        viewportSize={viewportSize}
+        onNavigate={handleMiniMapNavigate}
+      />
+
       <div className="tree-controls">
         <button type="button" onClick={() => zoomBy(0.15)} title="Zoom in">+</button>
-        <button type="button" onClick={() => zoomBy(-0.15)} title="Zoom out">{'\u2212'}</button>
-        <button type="button" onClick={resetView} title="Reset view">{'\u21BB'}</button>
+        <button type="button" onClick={() => zoomBy(-0.15)} title="Zoom out">{'−'}</button>
+        <button type="button" onClick={resetView} title="Reset view">{'↻'}</button>
       </div>
     </div>
   );
-}
+});
+
+export default FamilyTree;
