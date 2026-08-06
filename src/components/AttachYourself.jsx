@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import Modal from './Modal';
-import { getFullName } from '../utils/familyUtils';
+import { getDisplayName, getFullName } from '../utils/familyUtils';
 import '../styles/AttachYourself.css';
 
 const MAX_RESULTS = 8;
@@ -28,7 +28,7 @@ export default function AttachYourself({ persons, onAttach, onMarkAsMe, onCancel
     const term = query.trim().toLowerCase();
     if (!term) return [];
     return Object.values(persons)
-      .filter((person) => !person.isPlaceholder && getFullName(person).toLowerCase().includes(term))
+      .filter((person) => !person.isPlaceholder && getDisplayName(person).toLowerCase().includes(term))
       .slice(0, MAX_RESULTS);
   }, [persons, query]);
 
@@ -53,7 +53,7 @@ export default function AttachYourself({ persons, onAttach, onMarkAsMe, onCancel
               {matches.map((person) => (
                 <li key={person.id}>
                   <button type="button" onClick={() => setAnchorId(person.id)}>
-                    {getFullName(person)}
+                    {getDisplayName(person)}
                   </button>
                 </li>
               ))}

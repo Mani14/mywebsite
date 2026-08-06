@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import { getFullName } from '../utils/familyUtils';
+import { getDisplayName } from '../utils/familyUtils';
 import '../styles/SearchBar.css';
 
 const MAX_RESULTS = 8;
@@ -15,7 +15,7 @@ export default function SearchBar({ persons, onLocate }) {
     const term = query.trim().toLowerCase();
     if (!term) return [];
     return Object.values(persons)
-      .filter((person) => getFullName(person).toLowerCase().includes(term))
+      .filter((person) => getDisplayName(person).toLowerCase().includes(term))
       .slice(0, MAX_RESULTS);
   }, [persons, query]);
 
@@ -75,7 +75,7 @@ export default function SearchBar({ persons, onLocate }) {
                     }}
                     title="Focus this person"
                   >
-                    {getFullName(person)}
+                    {getDisplayName(person)}
                   </button>
                 </li>
               ))

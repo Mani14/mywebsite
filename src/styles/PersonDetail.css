@@ -35,12 +35,23 @@
   }
 }
 
+/* Sticky so the name + close button stay visible while the rest of a long panel
+   (stats, relations, notes) scrolls underneath — same reasoning as the Edit Person
+   form's sticky header/footer. Bled out to the panel's own edges via negative
+   margins (undoing .person-detail's padding) then re-added as its own padding, so
+   the background covers edge-to-edge instead of floating as an inset card. */
 .detail-header {
+  position: sticky;
+  top: calc(-1 * var(--space-5));
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
-  padding-right: 30px;
+  margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) 16px;
+  padding: var(--space-5) calc(var(--space-5) + 30px) 12px var(--space-5);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 .detail-name-row {
@@ -86,6 +97,13 @@
 .dagger {
   color: var(--color-text-muted);
   margin-right: 4px;
+}
+
+.detail-pet-name {
+  margin-left: 6px;
+  font-weight: 500;
+  font-size: 0.85em;
+  color: var(--color-text-muted);
 }
 
 .detail-badge {
@@ -191,7 +209,7 @@
 }
 
 .detail-link {
-  padding: 4px 10px;
+  padding: 6px 12px;
   font-size: 13px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
@@ -201,7 +219,11 @@
   transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
-.detail-link-row .detail-link {
+/* Only flatten the right edge when an unlink "x" button actually follows (Spouse/
+   Parents/Children) — Siblings has no unlink button, so without this guard its pill
+   was left with a rounded left edge and a flat, borderless right edge (looked like a
+   half-finished rectangle instead of a pill). */
+.detail-link-row:has(.detail-unlink) .detail-link {
   border-radius: 999px 0 0 999px;
   border-right: none;
 }
@@ -234,17 +256,28 @@
   }
 }
 
+/* Stuck to the bottom of the (scrollable) panel — same reasoning as the Edit Person
+   form's sticky footer — so Edit/Delete/etc. stay reachable without scrolling all
+   the way down on a person with a lot of relations/stats/notes above. */
 .detail-actions {
+  position: sticky;
+  bottom: calc(-1 * var(--space-5));
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin: 0 calc(-1 * var(--space-5)) calc(-1 * var(--space-5));
+  padding: 12px var(--space-5) var(--space-5);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 .detail-actions button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 8px 14px;
   font-size: 13px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);

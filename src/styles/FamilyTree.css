@@ -229,6 +229,15 @@
   max-width: 100px;
 }
 
+.mini-pet-name {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  line-height: 1.1;
+  max-width: 100px;
+  margin-top: -2px;
+}
+
 .dagger {
   color: var(--color-deceased-border);
   margin-right: 3px;

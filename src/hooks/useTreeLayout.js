@@ -6,6 +6,7 @@ import {
   countDescendants,
   primaryLineageRoot,
   getLineageRootIds,
+  getBloodAncestorIds,
 } from '../utils/familyUtils';
 
 // Card + spacing geometry (in world pixels).
@@ -199,29 +200,41 @@ export const TREE_GAP = 100; // horizontal gap between separate disconnected fam
 // or simply isn't part of this particular layout call at all (e.g. Pedigree View
 // only ever lays out the focus person's own two lineages).
 //
-// The size check is an ABSOLUTE threshold, not "smaller than the other side" — a
-// relative comparison is fragile: growing a real second family (e.g. adding more
-// people to Kasi's tree) would otherwise be enough to flip it from "shown" to
-// "hidden" purely because the OTHER side grew even more, with nothing about Kasi's
-// own family having changed. An absolute floor means a substantial family (Kasi's
-// 25+ people) never gets excluded regardless of how large a linked family grows,
-// while genuinely tiny satellites (a 3-5 person married-in cluster) still are.
+// Whether a bridged-in root gets excluded is decided by BLOOD relation to the
+// viewer's own root person (`priorityId`), not by size — a root is excluded only
+// if it is NOT one of priorityId's own blood-ancestor lines (see getBloodAncestorIds)
+// AND it's bridged to a strictly bigger root. This is why Kasi's family (Manikandan's
+// own maternal-grandfather line, reached via Vanaja) is never excluded no matter how
+// large it grows, while Sofiya's parents' side (purely her own relatives, connected
+// to Manikandan only through marrying him) is excluded even though — unlike Sridhar's
+// or Shankar's tiny satellite sides — it has grown well past a handful of people:
+// it's still nobody's blood relative here, only reachable via her "jump to their
+// family" badge. When no priorityId is available, falls back to an absolute size
+// floor so a lone genuinely tiny married-in cluster is still hidden by default.
 const SATELLITE_MAX_SIZE = 10;
 
-// `excludeSatellites` (default true) drops tiny bridged-in clusters, per the note
-// above — set to false when the caller has deliberately chosen a small, specific
-// set of roots to render in full (e.g. computePedigreeLayout's father/mother-side
-// pair) where nobody should ever be trimmed.
-export function computeForestLayout(persons, rootIds, collapsed = new Set(), { excludeSatellites = true } = {}) {
+// `excludeSatellites` (default true) drops bridged-in clusters that aren't part of
+// priorityId's own blood lines, per the note above — set to false when the caller
+// has deliberately chosen a small, specific set of roots to render in full (e.g.
+// computePedigreeLayout's father/mother-side pair) where nobody should ever be trimmed.
+export function computeForestLayout(
+  persons,
+  rootIds,
+  collapsed = new Set(),
+  { excludeSatellites = true, priorityId = null } = {}
+) {
   const out = { nodes: [], links: [], crossLinks: [], maxDepth: 0, width: 0, height: 0 };
   const bridges = findRootBridges(persons, rootIds);
 
   const sizeOf = (id) => countDescendants(persons, id);
+  const bloodAncestors = priorityId ? getBloodAncestorIds(persons, priorityId) : null;
+  const isSatelliteCandidate = (id) =>
+    bloodAncestors ? !bloodAncestors.has(id) : sizeOf(id) <= SATELLITE_MAX_SIZE;
   const excludedRoots = new Set(
     excludeSatellites
       ? rootIds.filter(
           (id) =>
-            sizeOf(id) <= SATELLITE_MAX_SIZE &&
+            isSatelliteCandidate(id) &&
             bridges.some(
               (b) => (b.a === id && sizeOf(b.b) > sizeOf(id)) || (b.b === id && sizeOf(b.a) > sizeOf(id))
             )
@@ -371,8 +384,11 @@ export function computeForestLayout(persons, rootIds, collapsed = new Set(), { e
   return out;
 }
 
-export function useForestLayout(persons, rootIds, collapsed) {
-  return useMemo(() => computeForestLayout(persons, rootIds, collapsed), [persons, rootIds, collapsed]);
+export function useForestLayout(persons, rootIds, collapsed, priorityId) {
+  return useMemo(
+    () => computeForestLayout(persons, rootIds, collapsed, { priorityId }),
+    [persons, rootIds, collapsed, priorityId]
+  );
 }
 
 // --- Full family pedigree (father's whole lineage + mother's whole lineage) ---

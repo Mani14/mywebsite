@@ -34,7 +34,7 @@
 .person-form input,
 .person-form select,
 .person-form textarea {
-  padding: 9px 12px;
+  padding: 11px 12px;
   font-size: 14px;
   font-weight: 400;
   color: var(--color-text);
@@ -65,6 +65,51 @@
 .person-form-row label {
   flex: 1;
   min-width: 0;
+}
+
+.person-form-hint {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  opacity: 0.85;
+}
+
+/* Modern pill-based radio group — bigger, more obvious tap targets than a native
+   <select> on a touchscreen, and shows all options at a glance without opening a menu. */
+.person-form-segmented {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.person-form-segmented button {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--color-text-muted);
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+}
+
+.person-form-segmented button.active {
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+@media (hover: hover) {
+  .person-form-segmented button:not(.active):hover {
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
 }
 
 /* A styled toggle switch driven by a real (visually-hidden) checkbox, so it stays
@@ -217,17 +262,26 @@
   padding: 2px 4px;
 }
 
+/* Stuck to the bottom of the (scrollable) modal so Cancel/Save stay reachable
+   without scrolling all the way down — the single biggest win for a long form
+   on a small phone screen. */
 .person-form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 4px;
+  margin: 4px 0 0;
   padding-top: 14px;
   border-top: 1px solid var(--color-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 .person-form-actions button {
-  padding: 9px 18px;
+  padding: 11px 20px;
   font-size: 13.5px;
   font-weight: 600;
   border: 1px solid var(--color-border);
@@ -359,9 +413,11 @@
 
   .person-form-actions {
     justify-content: stretch;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .person-form-actions button {
     flex: 1;
+    padding: 13px 18px;
   }
 }

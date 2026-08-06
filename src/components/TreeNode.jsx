@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight, BadgeCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { NODE_W, NODE_H, COUPLE_GAP, AVATAR_SIZE } from '../hooks/useTreeLayout';
-import { getFullName, getInitials } from '../utils/familyUtils';
+import { getDisplayName, getFullName, getInitials } from '../utils/familyUtils';
 
 // Half of the empty space beside the avatar within a card, so the link can reach the circle's edge.
 const CARD_SIDE_GAP = (NODE_W - AVATAR_SIZE) / 2;
@@ -55,7 +55,7 @@ function MiniCard({ person, isFocus, isHighlighted, isLocated, isMe, hasSpouse, 
         className={`mini-card${deceased ? ' mini-card-deceased' : ''}${isFocus ? ' mini-card-focus' : ''}${isHighlighted ? ' mini-card-highlighted' : ''}${isLocated ? ' mini-card-located' : ''}`}
         style={{ width: NODE_W, height: NODE_H }}
         onClick={() => (isFocus ? onSelect(person.id) : onFocus(person.id))}
-        title={getFullName(person)}
+        title={getDisplayName(person)}
       >
         <motion.span className="mini-card-avatar-wrap" tabIndex={-1} {...avatarSpring}>
           <span className={genderClass}>
@@ -67,6 +67,7 @@ function MiniCard({ person, isFocus, isHighlighted, isLocated, isMe, hasSpouse, 
           {deceased && <span className="dagger">†</span>}
           {getFullName(person)}
         </span>
+        {person.petName?.trim() && <span className="mini-pet-name">({person.petName.trim()})</span>}
       </button>
 
       {showJumpLink && (
@@ -120,7 +121,7 @@ function MiniCard({ person, isFocus, isHighlighted, isLocated, isMe, hasSpouse, 
 }
 
 // A positioned node holding a person (and optional spouse) plus an expand toggle.
-export default function TreeNode({ node, index, focusId, renderedIds, side, highlightedIds, meId, locatedId, onFocus, onSelect, onToggle, onQuickAdd, onJumpTo }) {
+export default function TreeNode({ node, index, focusId, side, highlightedIds, meId, locatedId, renderedIds, onFocus, onSelect, onToggle, onQuickAdd, onJumpTo }) {
   const { person, spouse, x, y, coupleWidth } = node;
   const left = x - coupleWidth / 2;
   const sideClass = side ? ` couple-side-${side}` : '';
@@ -207,11 +208,12 @@ export default function TreeNode({ node, index, focusId, renderedIds, side, high
             isMe={!!meId && spouse.id === meId}
             hasSpouse
             // Anyone married in who has their own recorded parents has a family
-            // tree of their own somewhere — offer a jump link to it UNLESS that
-            // parent (what the jump would take you to) is already drawn right
-            // here on this same canvas, which would make the jump redundant
-            // (e.g. their placeholder parent is already shown one row up).
-            showJumpLink={spouse.parentIds.some((pid) => !renderedIds?.has(pid))}
+            // tree of their own somewhere — the badge opens a dedicated Pedigree
+            // View centred on them. But if that parent is already drawn on THIS
+            // same canvas (e.g. Pedigree View renders both lineages in full), a
+            // jump badge next to a line pointing at the very same person is just
+            // redundant — suppress it in that case.
+            showJumpLink={spouse.parentIds.length > 0 && !spouse.parentIds.some((pid) => renderedIds?.has(pid))}
             onFocus={onFocus}
             onSelect={onSelect}
             onQuickAdd={onQuickAdd}

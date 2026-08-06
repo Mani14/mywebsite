@@ -160,6 +160,30 @@ export function getLineageRootIds(persons, personId) {
   return { fatherRootId, motherRootId };
 }
 
+// Every ancestor id reachable by walking BOTH recorded parents upward from `id`
+// (not just parentIds[0]'s primary line) — e.g. for Manikandan this includes both
+// his father's whole ancestry and his mother's, including Kasi via Vanaja. Used to
+// tell "this bridged family is one of the root person's own blood lines" (always
+// shown in full, e.g. Kasi's family, however large it grows) apart from "this
+// bridged family is purely a spouse's own relatives" (a satellite candidate, e.g.
+// Sofiya's parents' side) — see computeForestLayout's satellite exclusion.
+export function getBloodAncestorIds(persons, id) {
+  const result = new Set();
+  const stack = [id];
+  while (stack.length) {
+    const curId = stack.pop();
+    const cur = persons[curId];
+    if (!cur) continue;
+    (cur.parentIds || []).forEach((pid) => {
+      if (!result.has(pid)) {
+        result.add(pid);
+        stack.push(pid);
+      }
+    });
+  }
+  return result;
+}
+
 // Finds every distinct top-of-lineage person/couple (no recorded parents, and not
 // merely married into someone else's blood line) so each gets its own tree in the
 // rendered forest. Two families can still be linked deep inside by a marriage (e.g.
@@ -373,6 +397,31 @@ export function computeChildOrderOverrides(persons, orderedRoots, bridges) {
 export function getFullName(person) {
   if (!person) return '';
   return `${person.firstName} ${person.lastName}`.trim();
+}
+
+// Full name with the person's pet name appended in brackets, e.g. "Satish Kumar
+// Chandrasekaran (Sambu)" — used wherever a person's name is shown as their own
+// primary label (the detail panel header), not in tight spaces like tree cards or
+// inline confirm-dialog text where the extra text would just add clutter.
+export function getDisplayName(person) {
+  const name = getFullName(person);
+  return person?.petName?.trim() ? `${name} (${person.petName.trim()})` : name;
+}
+
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Formats an ISO date for display as "14-Jun-1991" — the underlying <input type="date">
+// value stays ISO (browsers require that), this is purely presentational. Falls back to
+// showing the raw value as-is for anything that isn't a full YYYY-MM-DD (e.g. a
+// year-only "1995", which the app allows when the exact date isn't known).
+export function formatDateDisplay(iso) {
+  if (!iso) return '';
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!match) return iso;
+  const [, year, month, day] = match;
+  const monthAbbr = MONTH_ABBR[Number(month) - 1];
+  if (!monthAbbr) return iso;
+  return `${day}-${monthAbbr}-${year}`;
 }
 
 export function getInitials(person) {
@@ -626,6 +675,7 @@ export function createEmptyPerson(id) {
     id,
     firstName: '',
     lastName: '',
+    petName: '',
     gender: 'other',
     dob: '',
     dod: '',

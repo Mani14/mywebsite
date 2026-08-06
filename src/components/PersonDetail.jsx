@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
-import { BadgeCheck, Baby, Briefcase, Cake, Crown, GitBranch, HeartHandshake, Mail, MapPin, PartyPopper, Pencil, Phone, Sparkles, Trash2, UserPlus, X, XCircle } from 'lucide-react';
+import { BadgeCheck, Baby, Briefcase, Cake, Crown, GitBranch, HeartHandshake, Mail, MapPin, PartyPopper, Pencil, Phone, Sparkles, Trash2, UserPlus, Users, X, XCircle } from 'lucide-react';
 import {
+  formatDateDisplay,
   getAgeInfo,
   getChildren,
   getDaysUntilBirthday,
@@ -57,6 +58,7 @@ export default function PersonDetail({
   onAddChild,
   onAddSpouse,
   onAddParent,
+  onAddSibling,
   onDelete,
   onSetRoot,
   onViewTree,
@@ -88,11 +90,10 @@ export default function PersonDetail({
       exit={{ opacity: 0, x: 40 }}
       transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
     >
-      <button type="button" className="detail-close" onClick={onClose} aria-label="Close">
-        <X size={18} />
-      </button>
-
       <div className="detail-header">
+        <button type="button" className="detail-close" onClick={onClose} aria-label="Close">
+          <X size={18} />
+        </button>
         <span className={`avatar avatar-${person.gender} detail-avatar`}>
           {person.photo ? <img src={person.photo} alt="" /> : getInitials(person)}
         </span>
@@ -101,6 +102,7 @@ export default function PersonDetail({
             <h2 className="detail-name">
               {!person.isAlive && <span className="dagger">†</span>}
               {getFullName(person)}
+              {person.petName?.trim() && <span className="detail-pet-name">({person.petName.trim()})</span>}
             </h2>
             <button type="button" className="detail-edit-btn" onClick={onEdit} title="Edit" aria-label="Edit">
               <Pencil size={13} />
@@ -119,8 +121,8 @@ export default function PersonDetail({
       </div>
 
       <div className="detail-fields">
-        {person.dob && <div className="detail-field"><Cake size={14} /> {person.dob}</div>}
-        {!person.isAlive && person.dod && <div className="detail-field">🕊️ {person.dod}</div>}
+        {person.dob && <div className="detail-field"><Cake size={14} /> {formatDateDisplay(person.dob)}</div>}
+        {!person.isAlive && person.dod && <div className="detail-field">🕊️ {formatDateDisplay(person.dod)}</div>}
         {person.work && <div className="detail-field"><Briefcase size={14} /> {person.work}</div>}
         {person.location && <div className="detail-field"><MapPin size={14} /> {person.location}</div>}
         {person.phone && <div className="detail-field"><Phone size={14} /> {person.phone}</div>}
@@ -162,7 +164,7 @@ export default function PersonDetail({
 
       <div className="detail-relations">
         <RelationList
-          title={spouse ? `Spouse${person.marriageDate ? ` (m. ${person.marriageDate})` : ''}` : ''}
+          title={spouse ? `Spouse${person.marriageDate ? ` (m. ${formatDateDisplay(person.marriageDate)})` : ''}` : ''}
           people={spouse ? [spouse] : []}
           onNavigate={onNavigate}
           onUnlink={onUnlinkSpouse}
@@ -180,6 +182,9 @@ export default function PersonDetail({
         )}
         {parents.length < 2 && (
           <button type="button" onClick={onAddParent}><UserPlus size={14} /> Add Parent</button>
+        )}
+        {onAddSibling && (
+          <button type="button" onClick={onAddSibling}><Users size={14} /> Add Sibling</button>
         )}
         {onViewTree && (
           <button type="button" onClick={() => onViewTree(person.id)}><GitBranch size={14} /> View Tree</button>

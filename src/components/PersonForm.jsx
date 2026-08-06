@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Camera } from 'lucide-react';
-import { getEligibleLinkCandidates, getFullName } from '../utils/familyUtils';
+import { getDisplayName, getEligibleLinkCandidates } from '../utils/familyUtils';
 import Modal from './Modal';
 import '../styles/PersonForm.css';
 
 const emptyForm = {
   firstName: '',
   lastName: '',
+  petName: '',
   gender: 'male',
   dob: '',
   dod: '',
@@ -19,6 +20,12 @@ const emptyForm = {
   notes: '',
   marriageDate: '',
 };
+
+const GENDER_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+];
 
 // `persons`/`personId`/`relation`/`onLinkExisting` are only passed for add-relative flows
 // (addParent/addSpouse/addChild/addSibling) — when present, a "Link Existing" tab lets the
@@ -44,7 +51,7 @@ export default function PersonForm({
     if (!canLinkExisting || tab !== 'link') return [];
     const eligible = getEligibleLinkCandidates(persons, personId, relation);
     const term = linkQuery.trim().toLowerCase();
-    const filtered = term ? eligible.filter((p) => getFullName(p).toLowerCase().includes(term)) : eligible;
+    const filtered = term ? eligible.filter((p) => getDisplayName(p).toLowerCase().includes(term)) : eligible;
     return filtered.slice(0, 20);
   }, [canLinkExisting, tab, persons, personId, relation, linkQuery]);
 
@@ -60,8 +67,8 @@ export default function PersonForm({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!form.firstName.trim() || !form.lastName.trim()) {
-      setError('First name and last name are required.');
+    if (!form.firstName.trim()) {
+      setError('First name is required.');
       return;
     }
     onSave(form);
@@ -101,7 +108,7 @@ export default function PersonForm({
               {candidates.length > 0 ? (
                 candidates.map((p) => (
                   <li key={p.id}>
-                    <span>{getFullName(p)}</span>
+                    <span>{getDisplayName(p)}</span>
                     <button type="button" onClick={() => onLinkExisting(p.id)}>Link</button>
                   </li>
                 ))
@@ -143,23 +150,58 @@ export default function PersonForm({
           <div className="person-form-row">
             <label>
               First name*
-              <input value={form.firstName} onChange={(e) => setField('firstName', e.target.value)} />
+              <input
+                value={form.firstName}
+                onChange={(e) => setField('firstName', e.target.value)}
+                autoCapitalize="words"
+              />
             </label>
             <label>
-              Last name*
-              <input value={form.lastName} onChange={(e) => setField('lastName', e.target.value)} />
+              Last name (optional)
+              <input
+                value={form.lastName}
+                onChange={(e) => setField('lastName', e.target.value)}
+                autoCapitalize="words"
+              />
             </label>
           </div>
+
+          <label>
+            Pet name (optional)
+            <input
+              value={form.petName}
+              onChange={(e) => setField('petName', e.target.value)}
+              placeholder="e.g. Sambu"
+              autoCapitalize="words"
+            />
+            <span className="person-form-hint">Shown in brackets next to the name, e.g. “{form.firstName || 'Name'} ({form.petName || 'Pet name'})”</span>
+          </label>
 
           <div className="person-form-row">
             <label>
               Gender
-              <select value={form.gender} onChange={(e) => setField('gender', e.target.value)}>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
+              <div className="person-form-segmented" role="radiogroup" aria-label="Gender">
+                {GENDER_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={form.gender === opt.value}
+                    className={form.gender === opt.value ? 'active' : ''}
+                    onClick={() => setField('gender', opt.value)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </label>
+            <label>
+              Date of birth (optional)
+              <input type="date" value={form.dob} onChange={(e) => setField('dob', e.target.value)} />
+            </label>
+          </div>
+
+          <div className="person-form-row">
             {showMarriageDate && (
               <label>
                 Marriage date (optional)
@@ -170,13 +212,6 @@ export default function PersonForm({
                 />
               </label>
             )}
-          </div>
-
-          <div className="person-form-row">
-            <label>
-              Date of birth (optional)
-              <input type="date" value={form.dob} onChange={(e) => setField('dob', e.target.value)} />
-            </label>
             <label className="person-form-toggle">
               <input
                 type="checkbox"

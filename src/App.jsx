@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, GitBranch, Link2, LocateFixed, LogOut, Menu, Redo2, Undo2 } from 'lucide-react';
+import { ArrowLeft, Check, GitBranch, Link2, LocateFixed, LogOut, Menu, Redo2, ShieldCheck, Undo2 } from 'lucide-react';
 import { useFamily } from './hooks/useFamily';
 import { useAuth } from './hooks/useAuth';
 import Login from './components/Login';
@@ -14,6 +14,7 @@ import BirthdayWidget from './components/BirthdayWidget';
 import ImportExport from './components/ImportExport';
 import ThemeToggle from './components/ThemeToggle';
 import StatsPanel from './components/StatsPanel';
+import DataHealthPanel from './components/DataHealthPanel';
 import { getPerson, getFullName, getAncestorChain } from './utils/familyUtils';
 import './styles/App.css';
 
@@ -54,6 +55,7 @@ export default function App() {
   const [highlightedChain, setHighlightedChain] = useState([]); // ordered ids from a person up to their root, or [] if none
   const [locatedId, setLocatedId] = useState(null); // person shown with the green "located" ring (search / Locate Me)
   const [showStatsPanel, setShowStatsPanel] = useState(false);
+  const [showDataHealth, setShowDataHealth] = useState(false);
   const [showAttachWizard, setShowAttachWizard] = useState(false);
   // A locate request { id, nonce }: the nonce bumps on every Locate so FamilyTree
   // re-centres even when locating the same person twice or the current root.
@@ -427,6 +429,15 @@ export default function App() {
         >
           <Menu size={17} />
         </button>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => setShowDataHealth(true)}
+          aria-label="Data health check"
+          title="Scan for broken/inconsistent relationships"
+        >
+          <ShieldCheck size={17} />
+        </button>
         <SearchBar persons={persons} onLocate={handleLocatePerson} />
         <div className="app-header-actions">
           <AnimatePresence>
@@ -585,6 +596,7 @@ export default function App() {
               onAddChild={() => setFormState({ mode: 'addChild', personId: selected.id })}
               onAddSpouse={() => setFormState({ mode: 'addSpouse', personId: selected.id })}
               onAddParent={() => setFormState({ mode: 'addParent', personId: selected.id })}
+              onAddSibling={() => setFormState({ mode: 'addSibling', personId: selected.id })}
               onDelete={() => handleDelete(selected.id)}
               onSetRoot={handleSetAsRoot}
               onViewTree={handleJumpToFamily}
@@ -599,6 +611,14 @@ export default function App() {
       </main>
 
       <StatsPanel persons={persons} isOpen={showStatsPanel} onClose={() => setShowStatsPanel(false)} onSelect={handleLocatePerson} />
+
+      <DataHealthPanel
+        persons={persons}
+        isOpen={showDataHealth}
+        onClose={() => setShowDataHealth(false)}
+        onSelect={handleLocatePerson}
+        updatePerson={updatePerson}
+      />
 
       {showAttachWizard && (
         <AttachYourself

@@ -1,0 +1,209 @@
+import { getFullName } from './familyUtils';
+
+// Pure detection only — no mutation happens here. Each issue optionally carries a
+// `fix` descriptor ({ action, label, ...ids }) that DataHealthPanel interprets and
+// applies via updatePerson, always reading the LIVE persons object at click time
+// (not a value snapshotted when the issue was first detected) so a fix is never
+// computed against stale data if something else changed while the panel was open.
+function findDuplicates(arr) {
+  const seen = new Set();
+  const dupes = new Set();
+  arr.forEach((v) => {
+    if (seen.has(v)) dupes.add(v);
+    seen.add(v);
+  });
+  return [...dupes];
+}
+
+const name = (persons, id) => (persons[id] ? getFullName(persons[id]) : 'Someone');
+
+export function runDataHealthCheck(persons) {
+  const issues = [];
+  const ids = Object.keys(persons);
+
+  for (const id of ids) {
+    const person = persons[id];
+
+    // Self-references — always a data error, never legitimate.
+    if (person.parentIds.includes(id)) {
+      issues.push({
+        id: `self-parent-${id}`,
+        severity: 'error',
+        category: 'Self-reference',
+        message: `${name(persons, id)} is listed as their own parent.`,
+        personIds: [id],
+        fix: { action: 'removeSelfParent', label: 'Remove', personId: id },
+      });
+    }
+    if (person.childrenIds.includes(id)) {
+      issues.push({
+        id: `self-child-${id}`,
+        severity: 'error',
+        category: 'Self-reference',
+        message: `${name(persons, id)} is listed as their own child.`,
+        personIds: [id],
+        fix: { action: 'removeSelfChild', label: 'Remove', personId: id },
+      });
+    }
+    if (person.spouseId === id) {
+      issues.push({
+        id: `self-spouse-${id}`,
+        severity: 'error',
+        category: 'Self-reference',
+        message: `${name(persons, id)} is listed as their own spouse.`,
+        personIds: [id],
+        fix: { action: 'removeSelfSpouse', label: 'Remove', personId: id },
+      });
+    }
+
+    // More than 2 recorded parents — the app's own UI never allows this, so it can
+    // only happen from a manual data edit; flag but don't guess which one to drop.
+    if (person.parentIds.length > 2) {
+      issues.push({
+        id: `too-many-parents-${id}`,
+        severity: 'error',
+        category: 'Too many parents',
+        message: `${name(persons, id)} has ${person.parentIds.length} recorded parents — should be at most 2.`,
+        personIds: [id, ...person.parentIds],
+        fix: null,
+      });
+    }
+
+    // Dangling references — the id is recorded but the person no longer exists
+    // (e.g. deleted without cleaning up who pointed at them).
+    person.parentIds.forEach((pid) => {
+      if (!persons[pid]) {
+        issues.push({
+          id: `dangling-parent-${id}-${pid}`,
+          severity: 'error',
+          category: 'Dangling reference',
+          message: `${name(persons, id)} lists a parent that no longer exists in the tree.`,
+          personIds: [id],
+          fix: { action: 'removeDanglingParent', label: 'Remove reference', personId: id, missingId: pid },
+        });
+      }
+    });
+    person.childrenIds.forEach((cid) => {
+      if (!persons[cid]) {
+        issues.push({
+          id: `dangling-child-${id}-${cid}`,
+          severity: 'error',
+          category: 'Dangling reference',
+          message: `${name(persons, id)} lists a child that no longer exists in the tree.`,
+          personIds: [id],
+          fix: { action: 'removeDanglingChild', label: 'Remove reference', personId: id, missingId: cid },
+        });
+      }
+    });
+    if (person.spouseId && !persons[person.spouseId]) {
+      issues.push({
+        id: `dangling-spouse-${id}`,
+        severity: 'error',
+        category: 'Dangling reference',
+        message: `${name(persons, id)} is linked to a spouse who no longer exists in the tree.`,
+        personIds: [id],
+        fix: { action: 'removeDanglingSpouse', label: 'Remove reference', personId: id },
+      });
+    }
+
+    // Duplicate entries within the same array — always safe to dedupe, never
+    // represents two genuinely distinct relationships.
+    if (findDuplicates(person.parentIds).length) {
+      issues.push({
+        id: `dup-parent-${id}`,
+        severity: 'warning',
+        category: 'Duplicate entry',
+        message: `${name(persons, id)}'s parent list has the same person recorded twice.`,
+        personIds: [id],
+        fix: { action: 'dedupeParents', label: 'Remove duplicate', personId: id },
+      });
+    }
+    if (findDuplicates(person.childrenIds).length) {
+      issues.push({
+        id: `dup-child-${id}`,
+        severity: 'warning',
+        category: 'Duplicate entry',
+        message: `${name(persons, id)}'s child list has the same person recorded twice.`,
+        personIds: [id],
+        fix: { action: 'dedupeChildren', label: 'Remove duplicate', personId: id },
+      });
+    }
+  }
+
+  // Asymmetric links — one side records the relationship, the other doesn't. This
+  // is the exact shape of bug that silently breaks jump badges / bridges: e.g. a
+  // parent-unlink that only cleared one side, leaving the other stale.
+  const seenSpousePairs = new Set();
+  for (const id of ids) {
+    const person = persons[id];
+
+    person.parentIds.forEach((pid) => {
+      const parent = persons[pid];
+      if (parent && !parent.childrenIds.includes(id)) {
+        issues.push({
+          id: `asym-pc-${pid}-${id}`,
+          severity: 'warning',
+          category: 'Asymmetric link',
+          message: `${name(persons, id)} lists ${name(persons, pid)} as a parent, but ${name(persons, pid)} doesn't list ${name(persons, id)} back as a child.`,
+          personIds: [id, pid],
+          fix: { action: 'addChildBackLink', label: 'Add missing back-link', parentId: pid, childId: id },
+        });
+      }
+    });
+
+    person.childrenIds.forEach((cid) => {
+      const child = persons[cid];
+      if (child && !child.parentIds.includes(id)) {
+        issues.push({
+          id: `asym-cp-${id}-${cid}`,
+          severity: 'warning',
+          category: 'Asymmetric link',
+          message: `${name(persons, id)} lists ${name(persons, cid)} as a child, but ${name(persons, cid)} doesn't list ${name(persons, id)} back as a parent.`,
+          personIds: [id, cid],
+          fix:
+            child.parentIds.length < 2
+              ? { action: 'addParentBackLink', label: 'Add missing back-link', childId: cid, parentId: id }
+              : null,
+        });
+      }
+    });
+
+    if (person.spouseId && persons[person.spouseId]) {
+      const spouse = persons[person.spouseId];
+      const pairKey = [id, person.spouseId].sort().join('|');
+      if (spouse.spouseId !== id && !seenSpousePairs.has(pairKey)) {
+        seenSpousePairs.add(pairKey);
+        issues.push({
+          id: `asym-spouse-${pairKey}`,
+          severity: 'warning',
+          category: 'Asymmetric link',
+          message: spouse.spouseId
+            ? `${name(persons, id)} lists ${name(persons, person.spouseId)} as their spouse, but ${name(persons, person.spouseId)} is linked to someone else instead.`
+            : `${name(persons, id)} lists ${name(persons, person.spouseId)} as their spouse, but it's not recorded the other way round.`,
+          personIds: [id, person.spouseId],
+          fix: spouse.spouseId
+            ? null
+            : { action: 'syncSpouseLink', label: 'Add missing back-link', personId: id, spouseId: person.spouseId },
+        });
+      }
+    }
+  }
+
+  // Informational only — not broken, just unfinished (see useFamily's addSibling).
+  for (const id of ids) {
+    const person = persons[id];
+    if (person.isPlaceholder) {
+      const kids = person.childrenIds.filter((cid) => persons[cid]).map((cid) => name(persons, cid));
+      issues.push({
+        id: `placeholder-${id}`,
+        severity: 'info',
+        category: 'Incomplete placeholder',
+        message: `An "Unknown Parent" placeholder for ${kids.join(' & ') || 'someone'} was never filled in.`,
+        personIds: [id, ...person.childrenIds.filter((cid) => persons[cid])],
+        fix: null,
+      });
+    }
+  }
+
+  return issues;
+}
