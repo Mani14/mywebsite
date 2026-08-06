@@ -185,17 +185,24 @@ export default function FamilyTree({
 
   const onMouseDown = (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    // Don't hijack clicks on cards/toggle buttons — only pan/pinch when starting on empty canvas.
-    if (e.target.closest('button')) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    // Every pointer's position is tracked regardless of what it started on — a
+    // second finger has to be trackable even if it lands on a card, which on a
+    // phone screen full of cards it very often will. Only a LONE first finger
+    // starting on a card/toggle button is left alone (that's a tap: select/focus),
+    // not captured or turned into a pan — but its position is still recorded here
+    // in case a second finger joins it for a pinch.
+    const onButton = !!e.target.closest('button');
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     if (pointers.current.size === 2) {
-      // A second finger just landed — hand off from single-finger pan to pinch.
+      // Two fingers down is unambiguously a pinch no matter what's underneath them.
       drag.current = null;
+      setIsDragging(false);
+      e.currentTarget.setPointerCapture(e.pointerId);
       const [a, b] = [...pointers.current.values()];
       pinchDist.current = Math.hypot(a.x - b.x, a.y - b.y);
-    } else if (pointers.current.size === 1) {
+    } else if (pointers.current.size === 1 && !onButton) {
+      e.currentTarget.setPointerCapture(e.pointerId);
       drag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
       setIsDragging(true);
     }
