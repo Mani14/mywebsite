@@ -71,6 +71,11 @@ export default function FamilyTree({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 40 });
   const drag = useRef(null);
+  // Every currently-down pointer, keyed by pointerId — lets us tell a one-finger pan
+  // apart from a two-finger pinch (iOS/touch devices send both through Pointer
+  // Events, never wheel events, so pinch has to be reconstructed from raw touches).
+  const pointers = useRef(new Map());
+  const pinchDist = useRef(null);
   const didCenter = useRef(false);
   // Gates the CSS transition below — on while zooming (buttons/wheel) so the jump
   // eases in smoothly, off while drag-panning so the tree tracks the cursor instantly.
@@ -179,14 +184,41 @@ export default function FamilyTree({
   );
 
   const onMouseDown = (e) => {
-    if (e.button !== 0) return;
-    // Don't hijack clicks on cards/toggle buttons — only pan when starting on empty canvas.
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // Don't hijack clicks on cards/toggle buttons — only pan/pinch when starting on empty canvas.
     if (e.target.closest('button')) return;
-    drag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
-    setIsDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.current.size === 2) {
+      // A second finger just landed — hand off from single-finger pan to pinch.
+      drag.current = null;
+      const [a, b] = [...pointers.current.values()];
+      pinchDist.current = Math.hypot(a.x - b.x, a.y - b.y);
+    } else if (pointers.current.size === 1) {
+      drag.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y };
+      setIsDragging(true);
+    }
   };
   const onMouseMove = (e) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.current.size === 2 && pinchDist.current) {
+      const [a, b] = [...pointers.current.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const rect = containerRef.current?.getBoundingClientRect();
+      const midX = (a.x + b.x) / 2 - (rect?.left ?? 0);
+      const midY = (a.y + b.y) / 2 - (rect?.top ?? 0);
+      // Incremental, same pattern as handleWheel: scale the CURRENT zoom by how much
+      // the finger spacing changed since the last move, anchored on the live
+      // midpoint — reuses zoomAt so the anchor-correction math isn't duplicated.
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomRef.current * (dist / pinchDist.current)));
+      zoomAt(midX, midY, next);
+      pinchDist.current = dist;
+      return;
+    }
+
     if (!drag.current) return;
     setPan({
       x: drag.current.panX + (e.clientX - drag.current.startX),
@@ -194,10 +226,26 @@ export default function FamilyTree({
     });
   };
   const endDrag = (e) => {
-    drag.current = null;
-    setIsDragging(false);
+    if (e?.pointerId != null) pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinchDist.current = null;
+
+    if (pointers.current.size === 1) {
+      // One finger lifted out of a pinch — resume single-finger panning from
+      // exactly where that finger already is, instead of jumping to it.
+      const [[, pt]] = pointers.current;
+      drag.current = { startX: pt.x, startY: pt.y, panX: pan.x, panY: pan.y };
+      setIsDragging(true);
+    } else if (pointers.current.size === 0) {
+      drag.current = null;
+      setIsDragging(false);
+    }
+
     if (e?.currentTarget?.releasePointerCapture && e.pointerId != null) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // Already released (e.g. pointercancel) — nothing to do.
+      }
     }
   };
 
