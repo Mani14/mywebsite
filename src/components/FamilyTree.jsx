@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useForestLayout, usePedigreeLayout } from '../hooks/useTreeLayout';
+import { NODE_W, COUPLE_GAP, useForestLayout, usePedigreeLayout } from '../hooks/useTreeLayout';
 import { getForestRoots, getLineageRootIds } from '../utils/familyUtils';
 import ConnectorLines from './ConnectorLines';
 import TreeNode from './TreeNode';
@@ -94,8 +94,16 @@ export default function FamilyTree({
     if (!el || !layout.width) return;
     const focusNode = layout.nodes.find((n) => n.person.id === rootId || n.spouse?.id === rootId);
     if (focusNode) {
+      // focusNode.x is the COUPLE's shared centre (see useTreeLayout's place()),
+      // not either individual's own avatar — offset to whichever half rootId
+      // actually is (primary renders left, spouse renders right; see TreeNode) so
+      // the focused/logged-in person's own circle lands at screen-centre, not the
+      // midpoint between them and their spouse.
+      const isSpouseSide = focusNode.spouse?.id === rootId && focusNode.person.id !== rootId;
+      const HALF_COUPLE_OFFSET = (NODE_W + COUPLE_GAP) / 2;
+      const focusX = focusNode.spouse ? focusNode.x + (isSpouseSide ? HALF_COUPLE_OFFSET : -HALF_COUPLE_OFFSET) : focusNode.x;
       setPan({
-        x: el.clientWidth / 2 - focusNode.x,
+        x: el.clientWidth / 2 - focusX,
         y: el.clientHeight / 2 - focusNode.y - 60,
       });
     } else {
