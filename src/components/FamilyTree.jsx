@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { NODE_H, NODE_W, COUPLE_GAP, useForestLayout, usePedigreeLayout } from '../hooks/useTreeLayout';
-import { getForestRoots, getLineageRootIds } from '../utils/familyUtils';
+import { getForestRoots, getLineageRootIds, isPrimaryOnLeft } from '../utils/familyUtils';
 import ConnectorLines from './ConnectorLines';
 import MiniMap from './MiniMap';
 import TreeNode from './TreeNode';
@@ -63,9 +63,14 @@ async function shareOrDownloadFile(blob, filename, mimeType) {
 // own circle can be centred exactly, not the midpoint between them and their spouse.
 function individualX(node, targetId) {
   if (!node.spouse) return node.x;
-  const isSpouseSide = node.spouse.id === targetId && node.person.id !== targetId;
+  // Same male-left/female-right check as TreeNode's own render order and the
+  // connector-line offsets — which side targetId's own avatar sits on depends on
+  // gender, not simply on whether they're the primary or spouse role in this node.
+  const primaryLeft = isPrimaryOnLeft(node.person, node.spouse);
+  const targetIsSpouse = node.spouse.id === targetId && node.person.id !== targetId;
+  const targetOnLeft = targetIsSpouse ? !primaryLeft : primaryLeft;
   const HALF_COUPLE_OFFSET = (NODE_W + COUPLE_GAP) / 2;
-  return node.x + (isSpouseSide ? HALF_COUPLE_OFFSET : -HALF_COUPLE_OFFSET);
+  return node.x + (targetOnLeft ? -HALF_COUPLE_OFFSET : HALF_COUPLE_OFFSET);
 }
 
 // Renders either every family in the dataset side by side (mode="forest", not just

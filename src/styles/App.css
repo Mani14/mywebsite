@@ -148,7 +148,7 @@
   align-items: center;
   gap: 8px;
   width: fit-content;
-  margin: 8px 16px 0;
+  flex-shrink: 0;
   padding: 6px 8px 6px 12px;
   border-radius: var(--radius-pill);
   font-size: 0.82rem;
@@ -293,34 +293,29 @@
     display: none;
   }
 
-  /* The search box no longer fights the title for space on its own line — it gets
-     a full-width row of its own, right under the title. */
+  /* Add Me / Locate Me shares the search box's own row, sitting right before it,
+     instead of floating as a separate strip underneath the header. */
+  .app-attach-pill {
+    order: 3;
+  }
+
   .app-header .search-bar {
     order: 3;
-    flex: 1 1 100%;
+    flex: 1 1 auto;
     max-width: none;
     min-width: 0;
   }
 
-  /* All the icon-button groups become one horizontally-scrollable strip on their
-     own row instead of wrapping mid-group into a ragged, overflowing mess. */
-  .app-header-actions {
-    order: 4;
-    flex: 1 1 100%;
-    margin-left: 0;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 2px;
-  }
-
-  .app-header-actions::-webkit-scrollbar {
+  /* Everything the desktop header shows as individual icon buttons (stats, data
+     health, undo/redo, pedigree view, data import/export, sign out) is folded into
+     MobileMenu's single hamburger dropdown instead — no room for a whole row of
+     icon buttons on a phone-width header. */
+  .desktop-header-item {
     display: none;
   }
 
-  .app-header-actions > * {
-    flex-shrink: 0;
+  .mobile-menu {
+    margin-left: auto;
   }
 }
 

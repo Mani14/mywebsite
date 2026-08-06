@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight, BadgeCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { NODE_W, NODE_H, COUPLE_GAP, AVATAR_SIZE } from '../hooks/useTreeLayout';
-import { getDisplayName, getFullName, getInitials } from '../utils/familyUtils';
+import { getDisplayName, getFullName, getInitials, isPrimaryOnLeft } from '../utils/familyUtils';
 
 // Half of the empty space beside the avatar within a card, so the link can reach the circle's edge.
 const CARD_SIDE_GAP = (NODE_W - AVATAR_SIZE) / 2;
@@ -173,52 +173,78 @@ export default function TreeNode({ node, index, focusId, side, highlightedIds, m
     );
   }
 
+  // App-wide rule: male renders left, female renders right — a fixed fact about
+  // this couple's genders, independent of who's "primary" (the blood descendant the
+  // layout recursed through, normally rendered first) vs. "spouse" (married in,
+  // normally rendered second), and never affected by focus/selection so it can't
+  // swap on click. See isPrimaryOnLeft — flips only the one combination that would
+  // otherwise violate it.
+  const primaryLeft = !spouse || isPrimaryOnLeft(person, spouse);
+  const primaryCard = (
+    <MiniCard
+      key="primary"
+      person={person}
+      isFocus={person.id === focusId}
+      isHighlighted={!!highlightedIds?.has(person.id)}
+      isLocated={person.id === locatedId}
+      isMe={!!meId && person.id === meId}
+      hasSpouse={!!spouse}
+      onFocus={onFocus}
+      onSelect={onSelect}
+      onQuickAdd={onQuickAdd}
+      onJumpTo={onJumpTo}
+    />
+  );
+  const spouseCard = spouse && (
+    <MiniCard
+      key="spouse"
+      person={spouse}
+      isFocus={spouse.id === focusId}
+      isHighlighted={!!highlightedIds?.has(spouse.id)}
+      isLocated={spouse.id === locatedId}
+      isMe={!!meId && spouse.id === meId}
+      hasSpouse
+      // Anyone married in who has their own recorded parents has a family
+      // tree of their own somewhere — the badge opens a dedicated Pedigree
+      // View centred on them. But if that parent is already drawn on THIS
+      // same canvas (e.g. Pedigree View renders both lineages in full), a
+      // jump badge next to a line pointing at the very same person is just
+      // redundant — suppress it in that case.
+      showJumpLink={spouse.parentIds.length > 0 && !spouse.parentIds.some((pid) => renderedIds?.has(pid))}
+      onFocus={onFocus}
+      onSelect={onSelect}
+      onQuickAdd={onQuickAdd}
+      onJumpTo={onJumpTo}
+    />
+  );
+  const coupleLink = spouse && (
+    <span
+      key="link"
+      className="couple-link"
+      style={{
+        width: COUPLE_GAP + CARD_SIDE_GAP * 2,
+        marginLeft: -CARD_SIDE_GAP,
+        marginRight: -CARD_SIDE_GAP,
+      }}
+      aria-hidden="true"
+    />
+  );
+
   return (
     <motion.div className="tree-node" style={{ left, top: y, width: coupleWidth }} {...entrance}>
       <div className={`couple${sideClass}`}>
-        <MiniCard
-          person={person}
-          isFocus={person.id === focusId}
-          isHighlighted={!!highlightedIds?.has(person.id)}
-          isLocated={person.id === locatedId}
-          isMe={!!meId && person.id === meId}
-          hasSpouse={!!spouse}
-          onFocus={onFocus}
-          onSelect={onSelect}
-          onQuickAdd={onQuickAdd}
-          onJumpTo={onJumpTo}
-        />
-        {spouse && (
-          <span
-            className="couple-link"
-            style={{
-              width: COUPLE_GAP + CARD_SIDE_GAP * 2,
-              marginLeft: -CARD_SIDE_GAP,
-              marginRight: -CARD_SIDE_GAP,
-            }}
-            aria-hidden="true"
-          />
-        )}
-        {spouse && (
-          <MiniCard
-            person={spouse}
-            isFocus={spouse.id === focusId}
-            isHighlighted={!!highlightedIds?.has(spouse.id)}
-            isLocated={spouse.id === locatedId}
-            isMe={!!meId && spouse.id === meId}
-            hasSpouse
-            // Anyone married in who has their own recorded parents has a family
-            // tree of their own somewhere — the badge opens a dedicated Pedigree
-            // View centred on them. But if that parent is already drawn on THIS
-            // same canvas (e.g. Pedigree View renders both lineages in full), a
-            // jump badge next to a line pointing at the very same person is just
-            // redundant — suppress it in that case.
-            showJumpLink={spouse.parentIds.length > 0 && !spouse.parentIds.some((pid) => renderedIds?.has(pid))}
-            onFocus={onFocus}
-            onSelect={onSelect}
-            onQuickAdd={onQuickAdd}
-            onJumpTo={onJumpTo}
-          />
+        {primaryLeft ? (
+          <>
+            {primaryCard}
+            {coupleLink}
+            {spouseCard}
+          </>
+        ) : (
+          <>
+            {spouseCard}
+            {coupleLink}
+            {primaryCard}
+          </>
         )}
       </div>
 

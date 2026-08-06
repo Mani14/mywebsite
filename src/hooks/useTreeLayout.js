@@ -7,6 +7,7 @@ import {
   primaryLineageRoot,
   getLineageRootIds,
   getBloodAncestorIds,
+  isPrimaryOnLeft,
 } from '../utils/familyUtils';
 
 // Card + spacing geometry (in world pixels).
@@ -135,18 +136,22 @@ function place(persons, id, depth, leftX, collapsed, out, visited, placed) {
   // Parent-to-child connectors, anchored to the avatar circle edges (not the whole
   // card). toX targets the CHILD's own avatar specifically — not the couple's shared
   // centre — so a child with a spouse attached (e.g. Renganayaki + Narayanan) reads
-  // unambiguously as "this line is Renganayaki's parentage," not the couple's.
+  // unambiguously as "this line is Renganayaki's parentage," not the couple's. The
+  // child (the blood relative) is normally rendered left of their own spouse, but
+  // isPrimaryOnLeft can flip that per the male-left/female-right rule, so which way
+  // to offset from the couple's shared centre has to be checked per child, not assumed.
   const childY = (depth + 1) * (NODE_H + V_GAP);
   const HALF_COUPLE_OFFSET = (NODE_W + COUPLE_GAP) / 2; // couple-centre -> the blood relative's own avatar
   placedChildren.forEach(({ id: c, center }) => {
     const childPerson = persons[c];
-    const childHasSpouse = childPerson.spouseId && persons[childPerson.spouseId];
+    const childSpouse = childPerson.spouseId ? persons[childPerson.spouseId] : null;
+    const offset = childSpouse ? (isPrimaryOnLeft(childPerson, childSpouse) ? -HALF_COUPLE_OFFSET : HALF_COUPLE_OFFSET) : 0;
     out.links.push({
       parentId: id,
       childId: c,
       fromX: centerX,
       fromY: y + AVATAR_TOP + AVATAR_SIZE,
-      toX: center - (childHasSpouse ? HALF_COUPLE_OFFSET : 0),
+      toX: center + offset,
       toY: childY + AVATAR_TOP,
     });
   });
@@ -159,13 +164,24 @@ function place(persons, id, depth, leftX, collapsed, out, visited, placed) {
 // a standalone single-tree call defaults to a fresh one. `rootChildOrder`, when given,
 // overrides the root's own childrenIds order (see computeForestLayout's bridge-facing
 // reordering) without needing to thread an override through the whole recursion.
-export function computeTreeLayout(persons, rootId, collapsed = new Set(), placed = new Set(), rootChildOrder = null) {
+// `childOrderOverrides` (a Map of personId -> reordered childrenIds; see
+// computeChildOrderOverrides) can now cover more than just rootId itself — a
+// bridge-facing reorder can need to touch several generations below the root (any
+// ancestor added above the actual branching person pushes it a level deeper) — so
+// every entry present gets patched in, not just rootId's own.
+export function computeTreeLayout(persons, rootId, collapsed = new Set(), placed = new Set(), childOrderOverrides = null) {
   const out = { nodes: [], links: [], crossLinks: [], maxDepth: 0, width: 0, height: 0 };
   if (!rootId || !persons[rootId] || placed.has(rootId)) return out;
 
-  const effectivePersons = rootChildOrder
-    ? { ...persons, [rootId]: { ...persons[rootId], childrenIds: rootChildOrder } }
-    : persons;
+  let effectivePersons = persons;
+  if (childOrderOverrides?.size) {
+    effectivePersons = { ...persons };
+    childOrderOverrides.forEach((childrenIds, personId) => {
+      if (effectivePersons[personId]) {
+        effectivePersons[personId] = { ...effectivePersons[personId], childrenIds };
+      }
+    });
+  }
 
   const totalWidth = measure(effectivePersons, rootId, collapsed, new Set(), placed);
   place(effectivePersons, rootId, 0, 0, collapsed, out, new Set(), placed);
@@ -295,7 +311,7 @@ export function computeForestLayout(
     const otherClaims = new Set(
       [...claimedBy.entries()].filter(([, owner]) => owner !== rootId).map(([claimedId]) => claimedId)
     );
-    const tree = computeTreeLayout(persons, rootId, collapsed, otherClaims, childOrderOverrides.get(rootId) ?? null);
+    const tree = computeTreeLayout(persons, rootId, collapsed, otherClaims, childOrderOverrides);
     if (!tree.nodes.length) return;
     batches.push({ rootId, tree, xOffset });
     pendingCrossLinks.push(...tree.crossLinks);
@@ -369,7 +385,15 @@ export function computeForestLayout(
     const childNode = childAsPrimary || childAsSpouse;
 
     if (parentNode && childNode) {
-      const childX = childAsSpouse ? childNode.x + HALF_COUPLE_OFFSET : childNode.x;
+      // Same male-left/female-right check as everywhere else — which side of the
+      // couple's shared centre the crosslinked person's own avatar sits on depends
+      // on gender, not just on whether they're rendered here as primary or spouse.
+      let childX = childNode.x;
+      if (childNode.spouse) {
+        const primaryLeft = isPrimaryOnLeft(childNode.person, childNode.spouse);
+        const onLeft = childAsSpouse ? !primaryLeft : primaryLeft;
+        childX = childNode.x + (onLeft ? -HALF_COUPLE_OFFSET : HALF_COUPLE_OFFSET);
+      }
       out.links.push({
         parentId,
         childId,

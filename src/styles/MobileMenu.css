@@ -1,0 +1,91 @@
+.mobile-menu {
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-menu-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.mobile-menu-trigger {
+  padding: 7px;
+}
+
+.mobile-menu-panel {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.mobile-menu-panel.glass-surface {
+  background: var(--color-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.mobile-menu-panel > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-family: var(--font);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+@media (hover: hover) {
+  .mobile-menu-panel > button:hover {
+    background: var(--color-primary);
+    color: #fff;
+  }
+}
+
+.mobile-menu-signout {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm) !important;
+}
+
+/* ImportExport is designed as a small standalone trigger for the desktop header —
+   stretched and re-styled here so it reads as one more full-width row instead of a
+   mismatched pill sitting inside this list. */
+.mobile-menu-nested {
+  display: flex;
+}
+
+.mobile-menu-nested .import-export {
+  width: 100%;
+}
+
+.mobile-menu-nested .import-export-trigger {
+  flex: 1;
+  width: 100%;
+  justify-content: flex-start;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 640px) {
+  .mobile-menu {
+    display: flex;
+  }
+}

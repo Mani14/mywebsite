@@ -15,6 +15,7 @@ import ImportExport from './components/ImportExport';
 import ThemeToggle from './components/ThemeToggle';
 import StatsPanel from './components/StatsPanel';
 import DataHealthPanel from './components/DataHealthPanel';
+import MobileMenu from './components/MobileMenu';
 import { getPerson, getFullName, getAncestorChain } from './utils/familyUtils';
 import './styles/App.css';
 
@@ -417,12 +418,13 @@ export default function App() {
           <span className="app-logo-mark"><BrandLogo size={22} /></span>
           <h1>Family Tree</h1>
         </div>
+        <ThemeToggle />
         {Object.keys(persons).length > 0 && (
-          <span className="app-header-count">{Object.keys(persons).length} members</span>
+          <span className="app-header-count desktop-header-item">{Object.keys(persons).length} members</span>
         )}
         <button
           type="button"
-          className="icon-btn app-stats-trigger"
+          className="icon-btn app-stats-trigger desktop-header-item"
           onClick={() => setShowStatsPanel(true)}
           aria-label="Family statistics"
           title="Full Stats"
@@ -431,15 +433,48 @@ export default function App() {
         </button>
         <button
           type="button"
-          className="icon-btn"
+          className="icon-btn desktop-header-item"
           onClick={() => setShowDataHealth(true)}
           aria-label="Data health check"
           title="Scan for broken/inconsistent relationships"
         >
           <ShieldCheck size={17} />
         </button>
+
+        {!meId ? (
+          <div className="app-attach-pill glass-surface">
+            <Link2 size={14} />
+            <span>Not linked yet</span>
+            <button type="button" onClick={() => setShowAttachWizard(true)}>
+              Add Me
+            </button>
+          </div>
+        ) : (
+          <div className="app-attach-pill glass-surface">
+            <LocateFixed size={14} />
+            <button type="button" onClick={() => handleLocatePerson(meId)}>
+              Locate Me
+            </button>
+          </div>
+        )}
+
         <SearchBar persons={persons} onLocate={handleLocatePerson} />
-        <div className="app-header-actions">
+
+        <MobileMenu
+          viewMode={viewMode}
+          onToggleViewMode={() => setViewMode((m) => (m === 'forest' ? 'pedigree' : 'forest'))}
+          onOpenStats={() => setShowStatsPanel(true)}
+          onOpenDataHealth={() => setShowDataHealth(true)}
+          onSignOut={signOut}
+          userEmail={user.email}
+          userPicture={user.picture}
+          exportData={exportData}
+          onImport={handleImport}
+          onExportImage={handleExportImage}
+          onExportPDF={handleExportPDF}
+        />
+
+        <div className="app-header-actions desktop-header-item">
           <AnimatePresence>
             {saveState === 'saved' && (
               <motion.span
@@ -484,7 +519,6 @@ export default function App() {
             onExportImage={handleExportImage}
             onExportPDF={handleExportPDF}
           />
-          <ThemeToggle />
 
           <div className="app-header-group app-user">
             {user.picture && (
@@ -511,23 +545,6 @@ export default function App() {
           </div>
         </div>
       </header>
-
-      {!meId ? (
-        <div className="app-attach-pill glass-surface">
-          <Link2 size={14} />
-          <span>Not linked yet</span>
-          <button type="button" onClick={() => setShowAttachWizard(true)}>
-            Add Me
-          </button>
-        </div>
-      ) : (
-        <div className="app-attach-pill glass-surface">
-          <LocateFixed size={14} />
-          <button type="button" onClick={() => handleLocatePerson(meId)}>
-            Locate Me
-          </button>
-        </div>
-      )}
 
       {viewMode === 'pedigree' && (
         <div className="pedigree-breadcrumb">

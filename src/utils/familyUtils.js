@@ -6,6 +6,23 @@ export function getPerson(persons, id) {
   return persons[id] || null;
 }
 
+// App-wide rule: in a rendered couple pairing, male always goes on the left, female
+// always on the right — a fixed, gender-only fact about the two people involved, not
+// tied to who's "primary" (the blood descendant the layout recursed through) vs.
+// "spouse" (married in), and never affected by who's currently focused/clicked, so
+// it can't flip mid-session. Only the one combination that would otherwise violate
+// it (person female, spouse male) flips the default "primary renders first" order;
+// every other combination (male+female already correct, both same gender, or
+// unknown/other) keeps that default, since there's no clear male/female distinction
+// to enforce there. Every place that lays out or targets a specific side of a couple
+// (TreeNode's render order, the connector-line/cross-link X offsets, centring on a
+// specific person) must go through this so the two can never disagree.
+export function isPrimaryOnLeft(person, spouse) {
+  if (!spouse) return true;
+  if (person?.gender === 'female' && spouse?.gender === 'male') return false;
+  return true;
+}
+
 export function getSpouse(persons, person) {
   if (!person || !person.spouseId) return null;
   return getPerson(persons, person.spouseId);
@@ -254,9 +271,14 @@ export function findRootBridges(persons, roots) {
     root.childrenIds.forEach((branchId) => {
       if (!persons[branchId]) return;
       const visited = new Set();
-      const stack = [branchId];
+      // Carries the full chain of ids from the root's direct child down to whoever
+      // actually does the bridging — not just that direct child — so a root whose
+      // bridging descendant is several generations down (e.g. a new ancestor added
+      // above what used to be the root) can still have EVERY level along the way
+      // reordered to face the neighbour, not just the root's own immediate child.
+      const stack = [{ id: branchId, path: [branchId] }];
       while (stack.length) {
-        const curId = stack.pop();
+        const { id: curId, path } = stack.pop();
         if (visited.has(curId) || !persons[curId]) continue;
         visited.add(curId);
         const cur = persons[curId];
@@ -269,11 +291,11 @@ export function findRootBridges(persons, roots) {
             if (!existing || weight > existing.weight) {
               // Genders of the actual bridging couple (not just the branch/ancestor
               // id), so orderRootsForBridges can put the husband's side on the left.
-              byRoot.get(rootId).set(otherRoot, { branchId, weight, selfGender: cur.gender, spouseGender: spouse.gender });
+              byRoot.get(rootId).set(otherRoot, { branchId, path, weight, selfGender: cur.gender, spouseGender: spouse.gender });
             }
           }
         }
-        cur.childrenIds.forEach((c) => stack.push(c));
+        cur.childrenIds.forEach((c) => stack.push({ id: c, path: [...path, c] }));
       }
     });
   });
@@ -291,6 +313,8 @@ export function findRootBridges(persons, roots) {
         b: otherRootId,
         branchA: info.branchId,
         branchB: reciprocal?.branchId ?? null,
+        pathA: info.path,
+        pathB: reciprocal?.path ?? null,
         weight: Math.min(countDescendants(persons, rootId), countDescendants(persons, otherRootId)),
         // From root a's side, the bridging person is `cur` (aGender) married to
         // `spouse` on root b's side (bGender) — see findRootBridges above.
@@ -352,43 +376,68 @@ export function orderRootsForBridges(roots, bridges) {
 // For each root, if one of its *actual* final neighbours (per orderRootsForBridges)
 // has a bridge to it, moves that bridge's branch to the edge facing that neighbour —
 // e.g. Subramanian's Kesavamoorthy branch moves to his rightmost slot when Kasi ends
-// up immediately to his right. Returns a Map of rootId -> reordered childrenIds
-// (only for roots that need reordering); callers with no entry just use the natural order.
+// up immediately to his right. The bridging descendant isn't always the root's own
+// direct child, though — if an ancestor gets added above the root (e.g. Subramanian's
+// own father), the root's one and only child is that ancestor's link to Subramanian,
+// while the actual siblings that need to move aside (Kesavamoorthy vs. his siblings)
+// are a level further down, under Subramanian, who by then isn't a root at all and
+// would otherwise never get reordered. `bridge.pathA`/`pathB` carry the FULL chain
+// from the root down to the actual bridging person, so this walks every step of that
+// chain and reorders EVERY level with more than one child, all toward the same edge —
+// each hop cascades the branch one generation further in the same direction, landing
+// the actual bridging descendant (and everyone under them) at the outermost edge of
+// the whole subtree, exactly as if they were still their own top-level root's child.
+// Returns a Map of personId -> reordered childrenIds (only for people who need
+// reordering, at any depth — not just orderedRoots); callers with no entry for a given
+// person just use that person's natural childrenIds order.
 export function computeChildOrderOverrides(persons, orderedRoots, bridges) {
   const bridgeByPair = new Map(bridges.map((br) => [[br.a, br.b].sort().join('|'), br]));
   const overrides = new Map();
+  // personId -> [{ childId, direction, weight }] — collected across every root/path
+  // before reordering, so a person reachable from two different bridge paths picks
+  // the heavier one, same tie-break as before.
+  const movesByPerson = new Map();
 
   orderedRoots.forEach((rootId, idx) => {
-    const person = persons[rootId];
-    if (!person) return;
     const neighbors = [
       [orderedRoots[idx - 1], 'left'],
       [orderedRoots[idx + 1], 'right'],
     ];
-    const moves = [];
     neighbors.forEach(([neighborId, direction]) => {
       if (!neighborId) return;
       const bridge = bridgeByPair.get([rootId, neighborId].sort().join('|'));
       if (!bridge) return;
-      const branchId = bridge.a === rootId ? bridge.branchA : bridge.branchB;
-      if (branchId && person.childrenIds.includes(branchId)) {
-        moves.push({ branchId, direction, weight: bridge.weight });
+      const path = bridge.a === rootId ? bridge.pathA : bridge.pathB;
+      if (!path || !path.length) return;
+      // path = [rootId's direct child, ..., the actual bridging person]. Walk every
+      // consecutive (parentId, childId) pair, including root -> path[0].
+      const fullChain = [rootId, ...path];
+      for (let i = 0; i < fullChain.length - 1; i += 1) {
+        const parentId = fullChain[i];
+        const childId = fullChain[i + 1];
+        if (!movesByPerson.has(parentId)) movesByPerson.set(parentId, []);
+        movesByPerson.get(parentId).push({ childId, direction, weight: bridge.weight });
       }
     });
-    if (!moves.length) return;
+  });
 
-    const byBranch = new Map();
+  movesByPerson.forEach((moves, personId) => {
+    const person = persons[personId];
+    if (!person) return;
+    const byChild = new Map();
     moves.forEach((m) => {
-      const existing = byBranch.get(m.branchId);
-      if (!existing || m.weight > existing.weight) byBranch.set(m.branchId, m);
+      if (!person.childrenIds.includes(m.childId)) return;
+      const existing = byChild.get(m.childId);
+      if (!existing || m.weight > existing.weight) byChild.set(m.childId, m);
     });
+    if (!byChild.size) return;
 
     let order = person.childrenIds.filter((c) => persons[c]);
-    byBranch.forEach((m) => {
-      order = order.filter((c) => c !== m.branchId);
-      order = m.direction === 'left' ? [m.branchId, ...order] : [...order, m.branchId];
+    byChild.forEach((m) => {
+      order = order.filter((c) => c !== m.childId);
+      order = m.direction === 'left' ? [m.childId, ...order] : [...order, m.childId];
     });
-    overrides.set(rootId, order);
+    overrides.set(personId, order);
   });
 
   return overrides;
