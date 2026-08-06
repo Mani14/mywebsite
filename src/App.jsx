@@ -416,7 +416,7 @@ export default function App() {
       <header className="app-header glass-surface">
         <div className="app-logo">
           <span className="app-logo-mark"><BrandLogo size={22} /></span>
-          <h1>Family Tree</h1>
+          <h1>Family <span className="app-logo-text-accent">Tree</span></h1>
         </div>
         <ThemeToggle />
         {Object.keys(persons).length > 0 && (
