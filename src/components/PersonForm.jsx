@@ -21,6 +21,36 @@ const emptyForm = {
   marriageDate: '',
 };
 
+// Avatars only ever render small (biggest is the ~56px detail-panel circle), but
+// an unmodified phone photo can be several MB — and the whole family shares ONE
+// Firestore document capped at 1MB total. A few full-resolution photos stored
+// directly would blow past that and break saves for EVERYONE, not just whoever
+// uploaded. Downscaling + re-encoding as JPEG here keeps each photo to roughly
+// 15-40KB regardless of the original.
+const MAX_PHOTO_DIMENSION = 320;
+const PHOTO_JPEG_QUALITY = 0.82;
+
+function resizePhoto(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error || new Error('Could not read file'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Could not read image'));
+      img.onload = () => {
+        const scale = Math.min(1, MAX_PHOTO_DIMENSION / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', PHOTO_JPEG_QUALITY));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 const GENDER_OPTIONS = [
   { value: 'male', label: 'Male' },
   { value: 'female', label: 'Female' },
@@ -57,12 +87,16 @@ export default function PersonForm({
 
   const setField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
-  const handlePhotoChange = (e) => {
+  const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setField('photo', reader.result);
-    reader.readAsDataURL(file);
+    try {
+      const resized = await resizePhoto(file);
+      setField('photo', resized);
+      setError('');
+    } catch {
+      setError('Could not process that photo — try a different one.');
+    }
   };
 
   const handleSubmit = (e) => {

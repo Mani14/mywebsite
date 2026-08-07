@@ -20,6 +20,25 @@
   font-size: 16px;
 }
 
+/* AnniversaryWidget reuses every other .birthday-widget class as-is — only the
+   color scheme differs, so the two are still visually distinguishable when both
+   happen to show at once. */
+.anniversary-widget {
+  background: #ffe9ef;
+  border-bottom-color: #f5b8cc;
+  color: #7a1f3d;
+}
+
+[data-theme='dark'] .anniversary-widget {
+  background: #3a1425;
+  border-bottom-color: #5c2038;
+  color: #f5a8c4;
+}
+
+.anniversary-widget-icon {
+  color: #e0577a;
+}
+
 .birthday-widget-list {
   display: flex;
   flex-wrap: wrap;

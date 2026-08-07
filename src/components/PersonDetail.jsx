@@ -36,7 +36,9 @@ function RelationList({ title, people, onNavigate, onUnlink, onReorder }) {
       const steps = index - dragIndex;
       const direction = steps > 0 ? 'down' : 'up';
       const draggedId = people[dragIndex].id;
-      for (let i = 0; i < Math.abs(steps); i += 1) onReorder(draggedId, direction);
+      // One call for the whole drag, not one per slot moved — see reorderChild's
+      // own comment for why (each call is its own undo-history entry).
+      onReorder(draggedId, direction, Math.abs(steps));
     }
     setDragIndex(null);
     setOverIndex(null);

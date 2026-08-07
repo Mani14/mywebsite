@@ -19,6 +19,13 @@ export default function MiniMap({ nodes, treeWidth, treeHeight, pan, zoom, viewp
     : 1;
   const offsetX = ready ? (MAP_W - treeWidth * scale) / 2 : 0;
   const offsetY = ready ? (MAP_H - treeHeight * scale) / 2 : 0;
+  // A dot fixed at one size regardless of `scale` reads fine for a small family,
+  // but as the tree grows, `scale` shrinks (more world packed into the same
+  // MAP_W x MAP_H box) and a still-full-size dot then covers proportionally more
+  // of that shrunken space — nearby people's dots start overlapping into an
+  // unreadable smear. Scaling the radius down alongside it keeps dots roughly as
+  // visually distinct at any family size, not just the one this was tuned for.
+  const dotRadius = Math.max(0.8, Math.min(2.2, scale * 30));
 
   // Current visible area, converted from screen/pan/zoom space into tree-space.
   const viewX = -pan.x / zoom;
@@ -59,7 +66,7 @@ export default function MiniMap({ nodes, treeWidth, treeHeight, pan, zoom, viewp
     >
       <svg width={MAP_W} height={MAP_H}>
         {nodes.map((n) => (
-          <circle key={n.id} className="mini-map-dot" cx={offsetX + n.x * scale} cy={offsetY + n.y * scale} r={1.6} />
+          <circle key={n.id} className="mini-map-dot" cx={offsetX + n.x * scale} cy={offsetY + n.y * scale} r={dotRadius} />
         ))}
         <rect
           className="mini-map-viewport"

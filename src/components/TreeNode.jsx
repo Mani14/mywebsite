@@ -33,14 +33,23 @@ function MiniCard({ person, isFocus, isHighlighted, isLocated, isMe, hasSpouse, 
         transition: { type: 'spring', stiffness: 320, damping: 18 },
       };
 
-  // Closes the quick-add menu on any click outside this card.
+  // Closes the quick-add menu on any click outside this card, or on Escape —
+  // matching the dismissal pattern the other dropdown menus in the app already
+  // use (ImportExport's menu, MobileMenu), which this one had drifted from.
   useEffect(() => {
     if (!menuOpen) return;
     const handlePointerDown = (e) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) setMenuOpen(false);
     };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
     document.addEventListener('pointerdown', handlePointerDown);
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [menuOpen]);
 
   const options = QUICK_ADD_OPTIONS.filter((opt) => opt.show(person, hasSpouse));

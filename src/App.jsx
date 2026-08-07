@@ -12,6 +12,7 @@ import SearchBar from './components/SearchBar';
 import PersonDetail from './components/PersonDetail';
 import PersonForm from './components/PersonForm';
 import BirthdayWidget from './components/BirthdayWidget';
+import AnniversaryWidget from './components/AnniversaryWidget';
 import ImportExport from './components/ImportExport';
 import ThemeToggle from './components/ThemeToggle';
 import StatsPanel from './components/StatsPanel';
@@ -537,22 +538,46 @@ export default function App() {
   const handleUnlinkSpouse = useCallback(() => {
     if (!selected?.spouseId) return;
     const spouse = getPerson(persons, selected.spouseId);
-    if (!window.confirm(`Remove the spouse link between ${getFullName(selected)} and ${getFullName(spouse)}?`)) return;
-    removeSpouse(selected.id);
+    setConfirmDialog({
+      title: 'Remove spouse link?',
+      message: `This removes the spouse link between ${getFullName(selected)} and ${getFullName(spouse)}. Neither person is deleted.`,
+      confirmLabel: 'Remove',
+      danger: true,
+      onConfirm: () => {
+        removeSpouse(selected.id);
+        setConfirmDialog(null);
+      },
+    });
   }, [selected, persons, removeSpouse]);
 
   const handleUnlinkParent = useCallback((parentId) => {
     if (!selected) return;
     const parent = getPerson(persons, parentId);
-    if (!window.confirm(`Remove ${getFullName(parent)} as ${getFullName(selected)}'s parent?`)) return;
-    removeParent(selected.id, parentId);
+    setConfirmDialog({
+      title: 'Remove parent link?',
+      message: `This removes ${getFullName(parent)} as ${getFullName(selected)}'s parent. Neither person is deleted.`,
+      confirmLabel: 'Remove',
+      danger: true,
+      onConfirm: () => {
+        removeParent(selected.id, parentId);
+        setConfirmDialog(null);
+      },
+    });
   }, [selected, persons, removeParent]);
 
   const handleUnlinkChild = useCallback((childId) => {
     if (!selected) return;
     const child = getPerson(persons, childId);
-    if (!window.confirm(`Remove ${getFullName(child)} as ${getFullName(selected)}'s child?`)) return;
-    removeChild(selected.id, childId);
+    setConfirmDialog({
+      title: 'Remove child link?',
+      message: `This removes ${getFullName(child)} as ${getFullName(selected)}'s child. Neither person is deleted.`,
+      confirmLabel: 'Remove',
+      danger: true,
+      onConfirm: () => {
+        removeChild(selected.id, childId);
+        setConfirmDialog(null);
+      },
+    });
   }, [selected, persons, removeChild]);
 
   const handleExportImage = useCallback(() => {
@@ -719,6 +744,7 @@ export default function App() {
       )}
 
       <BirthdayWidget persons={persons} onSelect={handleViewPersonDetails} />
+      <AnniversaryWidget persons={persons} onSelect={handleViewPersonDetails} />
 
       <main className="app-main">
         {rootPersonId ? (

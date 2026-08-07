@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, Download, FileImage, FileText, Upload } from 'lucide-react';
 import { validateFamilyData } from '../utils/familyUtils';
+import ConfirmDialog from './ConfirmDialog';
 import '../styles/ImportExport.css';
 
 export default function ImportExport({ exportData, onImport, onExportImage, onExportPDF }) {
@@ -11,6 +12,7 @@ export default function ImportExport({ exportData, onImport, onExportImage, onEx
   const menuRef = useRef(null);
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
+  const [pendingImport, setPendingImport] = useState(null);
   // Rendered via a portal (see below), so its position has to be tracked in JS
   // rather than a plain `position: absolute` against its natural parent.
   const [menuPos, setMenuPos] = useState(null);
@@ -80,11 +82,15 @@ export default function ImportExport({ exportData, onImport, onExportImage, onEx
         setError(validationError);
         return;
       }
-      if (!window.confirm('Import this file? It will replace the current family tree.')) return;
-      onImport(parsed);
-      setError('');
+      setPendingImport(parsed);
     };
     reader.readAsText(file);
+  };
+
+  const confirmImport = () => {
+    onImport(pendingImport);
+    setPendingImport(null);
+    setError('');
   };
 
   return (
@@ -147,6 +153,18 @@ export default function ImportExport({ exportData, onImport, onExportImage, onEx
         style={{ display: 'none' }}
       />
       {error && <span className="import-export-error" title={error}>{error}</span>}
+
+      {pendingImport && (
+        <ConfirmDialog
+          isOpen
+          title="Import this file?"
+          message="This replaces the current family tree with the file's contents. It's covered by Undo, but only until the app is closed."
+          confirmLabel="Import"
+          danger
+          onConfirm={confirmImport}
+          onCancel={() => setPendingImport(null)}
+        />
+      )}
     </div>
   );
 }

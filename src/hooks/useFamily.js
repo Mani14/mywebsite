@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, runTransaction, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import seedData from '../data/family.json';
 import { createEmptyPerson, generateId } from '../utils/familyUtils';
@@ -21,7 +21,13 @@ export function useFamily() {
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState('idle'); // 'idle' | 'saved'
   const [authed, setAuthed] = useState(() => !!auth.currentUser);
-  const lastSyncedJson = useRef(null);
+  // The persons map / rootPersonId as of the last successful sync with Firestore
+  // (either a remote update we just received, or our own last write) — the
+  // baseline the debounced save below diffs local state against to figure out
+  // what THIS device actually changed, rather than blindly overwriting the
+  // whole shared document (see the save effect for why that matters).
+  const lastSyncedPersons = useRef({});
+  const lastSyncedRoot = useRef(null);
   const saveTimer = useRef(null);
 
   // Kept in sync so history snapshots always capture the true current state,
@@ -59,24 +65,69 @@ export function useFamily() {
         }
         if (snap.metadata.hasPendingWrites) return; // ignore our own optimistic echo
         const data = snap.data();
-        lastSyncedJson.current = JSON.stringify({ rootPersonId: data.rootPersonId ?? null, persons: data.persons || {} });
-        setPersons(data.persons || {});
-        setRootPersonId(data.rootPersonId || Object.keys(data.persons || {})[0] || null);
+        const nextPersons = data.persons || {};
+        const nextRoot = data.rootPersonId || Object.keys(nextPersons)[0] || null;
+        lastSyncedPersons.current = nextPersons;
+        lastSyncedRoot.current = nextRoot;
+        setPersons(nextPersons);
+        setRootPersonId(nextRoot);
         setLoading(false);
       },
       () => setLoading(false)
     );
   }, [authed]);
 
-  // Debounced write of local edits back to the shared doc (skips no-op / remote echoes).
+  // Debounced write of local edits back to the shared doc. Diffs local state
+  // against the last-synced baseline (reference equality — every mutator above
+  // makes a NEW object only for the person(s) it actually touches, so an
+  // untouched person keeps the exact same reference) to find which specific
+  // records THIS device changed, then merges just those into whatever's
+  // CURRENTLY on the server inside a transaction — instead of blindly
+  // overwriting the whole document with a `setDoc`. Two relatives editing
+  // DIFFERENT people at the same time no longer silently clobber each other's
+  // changes. (Two edits to the exact SAME person at the same moment still
+  // resolve last-write-wins for that one record — true field-level merging
+  // would need a much bigger rework — but that's a far narrower window than
+  // every unrelated change on the whole tree getting wiped out.)
   useEffect(() => {
     if (loading || !authed || !rootPersonId) return undefined;
-    const json = JSON.stringify({ rootPersonId, persons });
-    if (json === lastSyncedJson.current) return undefined;
+    const baselinePersons = lastSyncedPersons.current;
+    const baselineRoot = lastSyncedRoot.current;
+    const baselineIds = Object.keys(baselinePersons);
+    const localIds = Object.keys(persons);
+    const unchanged =
+      rootPersonId === baselineRoot &&
+      localIds.length === baselineIds.length &&
+      localIds.every((id) => persons[id] === baselinePersons[id]);
+    if (unchanged) return undefined;
+
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      lastSyncedJson.current = json;
-      setDoc(doc(db, ...FAMILY_DOC), { rootPersonId, persons })
+      const localPersons = persons;
+      const localRoot = rootPersonId;
+      const changedIds = localIds.filter((id) => persons[id] !== baselinePersons[id]);
+      const deletedIds = baselineIds.filter((id) => !(id in localPersons));
+      const rootChangedLocally = localRoot !== baselineRoot;
+      // Guessed eagerly so a second edit made while this save is still in
+      // flight diffs against this point rather than re-sending it — corrected
+      // for real once the snapshot listener echoes back the committed result.
+      lastSyncedPersons.current = localPersons;
+      lastSyncedRoot.current = localRoot;
+
+      const ref = doc(db, ...FAMILY_DOC);
+      runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        const serverData = snap.exists() ? snap.data() : {};
+        const merged = { ...(serverData.persons || {}) };
+        changedIds.forEach((id) => {
+          merged[id] = localPersons[id];
+        });
+        deletedIds.forEach((id) => {
+          delete merged[id];
+        });
+        const mergedRoot = rootChangedLocally ? localRoot : (serverData.rootPersonId ?? localRoot);
+        tx.set(ref, { rootPersonId: mergedRoot, persons: merged });
+      })
         .then(() => {
           setSaveState('saved');
           setTimeout(() => setSaveState('idle'), 1500);
@@ -382,30 +433,40 @@ export function useFamily() {
     });
   }, [pushHistory]);
 
-  // Moves a child one slot earlier/later among its siblings — kept in sync across
-  // EVERY one of the child's recorded parents (not just whichever parent's detail
-  // panel triggered this), since both should agree on birth order. This is the
-  // only place birth order is captured when exact DOB isn't known: childrenIds
-  // array order doubles as both left-to-right tree position and, for the Tamil
-  // elder/younger terms, birth order (eldest first).
-  const reorderChild = useCallback((childId, direction) => {
+  // Moves a child `steps` slots earlier/later among its siblings (defaults to
+  // one step, for the up/down arrow buttons) — kept in sync across EVERY one of
+  // the child's recorded parents (not just whichever parent's detail panel
+  // triggered this), since both should agree on birth order. This is the only
+  // place birth order is captured when exact DOB isn't known: childrenIds array
+  // order doubles as both left-to-right tree position and, for the Tamil
+  // elder/younger terms, birth order (eldest first). Dragging a child several
+  // slots in one gesture (see PersonDetail's drag-and-drop) calls this ONCE with
+  // steps > 1 rather than once per slot — each step pushes its own history
+  // snapshot, so a multi-slot drag would otherwise burn through several undo
+  // entries for what the user experiences as a single action.
+  const reorderChild = useCallback((childId, direction, steps = 1) => {
     pushHistory();
     setPersons((prev) => {
       const child = prev[childId];
       if (!child) return prev;
       const next = { ...prev };
       let moved = false;
-      child.parentIds.forEach((parentId) => {
-        const parent = next[parentId];
-        if (!parent) return;
-        const ids = [...parent.childrenIds];
-        const idx = ids.indexOf(childId);
-        const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-        if (idx === -1 || swapIdx < 0 || swapIdx >= ids.length) return;
-        [ids[idx], ids[swapIdx]] = [ids[swapIdx], ids[idx]];
-        next[parentId] = { ...parent, childrenIds: ids };
+      for (let step = 0; step < steps; step += 1) {
+        let movedThisStep = false;
+        child.parentIds.forEach((parentId) => {
+          const parent = next[parentId];
+          if (!parent) return;
+          const ids = [...parent.childrenIds];
+          const idx = ids.indexOf(childId);
+          const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+          if (idx === -1 || swapIdx < 0 || swapIdx >= ids.length) return;
+          [ids[idx], ids[swapIdx]] = [ids[swapIdx], ids[idx]];
+          next[parentId] = { ...parent, childrenIds: ids };
+          movedThisStep = true;
+        });
+        if (!movedThisStep) break;
         moved = true;
-      });
+      }
       return moved ? next : prev;
     });
   }, [pushHistory]);

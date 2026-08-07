@@ -1,11 +1,11 @@
-import { GitBranch } from 'lucide-react';
+import BrandLogo from './BrandLogo';
 import '../styles/Login.css';
 
 export default function Login({ onSignIn }) {
   return (
     <div className="login-screen">
       <div className="login-card glass-surface">
-        <GitBranch size={32} className="login-icon" />
+        <span className="login-icon"><BrandLogo size={40} /></span>
         <h1>Family Tree</h1>
         <p>Sign in with Google to view and edit the family tree.</p>
         <button type="button" className="login-google-btn" onClick={onSignIn}>
