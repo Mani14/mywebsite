@@ -22,7 +22,13 @@
   padding-top: calc(var(--space-3) + env(safe-area-inset-top));
   box-shadow: var(--shadow-md);
   z-index: 10;
-  position: relative;
+  /* Sticky rather than plain relative — nothing about the current layout should
+     let the page scroll under normal use, but this is a cheap extra guarantee
+     the header stays put even in an edge case that does (e.g. a mobile
+     on-screen keyboard resizing the viewport), rather than relying purely on
+     the touch-action fix (see global.css) that stops the more common cause. */
+  position: sticky;
+  top: 0;
 }
 
 .app-logo {
