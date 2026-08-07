@@ -5,6 +5,17 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Family Tree</title>
+    <!-- Sets the theme before any CSS/React renders — without this, the page
+         paints with the light-theme :root colors first (the stylesheet applies
+         regardless of data-theme) and only flips to dark once React mounts and
+         ThemeToggle's effect runs, a visible flash on every load. Must stay in
+         sync with ThemeToggle.jsx's own STORAGE_KEY/default. -->
+    <script>
+      (function () {
+        var theme = localStorage.getItem('family-hierarchy-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
