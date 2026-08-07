@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { NODE_H, NODE_W, COUPLE_GAP, AVATAR_TOP, AVATAR_SIZE, useForestLayout, usePedigreeLayout } from '../hooks/useTreeLayout';
-import { getForestRoots, getLineageRootIds, isPrimaryOnLeft } from '../utils/familyUtils';
+import { findRootBridges, getForestRoots, getLineageRootIds, isPrimaryOnLeft } from '../utils/familyUtils';
 import ConnectorLines from './ConnectorLines';
 import MiniMap from './MiniMap';
 import TreeNode from './TreeNode';
@@ -249,15 +249,46 @@ const FamilyTree = forwardRef(function FamilyTree(
   // Dad-side/mom-side highlighting: whichever two lineage trees are the current
   // focus person's father's and mother's, tinted so their halves of the diagram
   // (or, in Full Tree View, just their two trees among everyone else's) stand out.
+  // Extends ONE hop across a marriage bridge — e.g. a paternal aunt who married
+  // into a separate root tree still tints as "father" side, not just the tree
+  // that's directly the father's own blood-descendant line. Deliberately NOT a
+  // full transitive BFS across every bridge reachable from there: in a real,
+  // densely-married family, bridges chain together fast enough that an unbounded
+  // walk eventually swallows the ENTIRE forest into one cluster, making the two
+  // sides indistinguishable. One hop is exactly the case this is for — someone
+  // bridged straight off father's/mother's own blood tree — without chaining
+  // through THAT tree's own further, unrelated marriages.
+  //
+  // The father-root and mother-root are themselves ALWAYS directly bridged —
+  // that's literally how they became "father" and "mother" (rootId's own two
+  // parents married each other) — so that specific bridge has to be excluded
+  // from each side's own one-hop expansion, or the very first hop would always
+  // immediately re-merge both sides back together.
   const { fatherRootId, motherRootId } = useMemo(() => getLineageRootIds(persons, rootId), [persons, rootId]);
+  const { fatherSideRoots, motherSideRoots } = useMemo(() => {
+    const bridges = findRootBridges(persons, rootIds);
+    const directBridgesOf = (startId, excludeId) => {
+      const set = new Set(startId ? [startId] : []);
+      if (!startId) return set;
+      bridges.forEach(({ a, b }) => {
+        if (a === startId && b !== excludeId) set.add(b);
+        if (b === startId && a !== excludeId) set.add(a);
+      });
+      return set;
+    };
+    return {
+      fatherSideRoots: directBridgesOf(fatherRootId, motherRootId),
+      motherSideRoots: directBridgesOf(motherRootId, fatherRootId),
+    };
+  }, [persons, rootIds, fatherRootId, motherRootId]);
   const sideOf = useCallback(
     (node) => {
       if (!node.treeRootId) return null;
-      if (node.treeRootId === fatherRootId) return 'father';
-      if (node.treeRootId === motherRootId) return 'mother';
+      if (fatherSideRoots.has(node.treeRootId)) return 'father';
+      if (motherSideRoots.has(node.treeRootId)) return 'mother';
       return null;
     },
-    [fatherRootId, motherRootId]
+    [fatherSideRoots, motherSideRoots]
   );
 
   const containerRef = useRef(null);

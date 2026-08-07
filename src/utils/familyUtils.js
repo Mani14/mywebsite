@@ -165,15 +165,23 @@ export function primaryLineageRoot(persons, id) {
 }
 
 // Resolves a person's father-side and mother-side lineage roots (their whole
-// blood families' respective tops), per the parentIds[0]=father/[1]=mother
-// convention — used both by computePedigreeLayout (which two trees to render)
-// and by the dad-side/mom-side highlight coloring (which tree a node came from).
+// blood families' respective tops) — used both by computePedigreeLayout (which
+// two trees to render, father's on the left) and by the dad-side/mom-side
+// highlight coloring (which tree a node came from). Identified by GENDER, not
+// parentIds array position — parentIds[0] is birth order/entry order (whichever
+// parent was recorded first), not reliably "the father," so a person whose
+// mother happened to be entered first would otherwise get their whole paternal
+// lineage mislabeled as "mother" (wrong tint color, and swapped left/right in
+// Pedigree View). Falls back to array order only when gender can't disambiguate
+// (e.g. both parents recorded as the same gender, or unknown).
 export function getLineageRootIds(persons, personId) {
   const person = getPerson(persons, personId);
   if (!person) return { fatherRootId: null, motherRootId: null };
-  const [fatherId, motherId] = person.parentIds;
-  const fatherRootId = fatherId && persons[fatherId] ? primaryLineageRoot(persons, fatherId) : null;
-  const motherRootId = motherId && persons[motherId] ? primaryLineageRoot(persons, motherId) : null;
+  const parents = (person.parentIds || []).map((pid) => persons[pid]).filter(Boolean);
+  const father = parents.find((p) => p.gender === 'male') || parents[0] || null;
+  const mother = parents.find((p) => p.gender === 'female' && p.id !== father?.id) || parents.find((p) => p.id !== father?.id) || null;
+  const fatherRootId = father ? primaryLineageRoot(persons, father.id) : null;
+  const motherRootId = mother ? primaryLineageRoot(persons, mother.id) : null;
   return { fatherRootId, motherRootId };
 }
 
