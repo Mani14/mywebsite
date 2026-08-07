@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { GitBranch, LogOut, Menu, ShieldCheck } from 'lucide-react';
+import { Compass, GitBranch, LogOut, Menu, ShieldCheck } from 'lucide-react';
 import ImportExport from './ImportExport';
 import '../styles/MobileMenu.css';
 
@@ -17,6 +17,7 @@ export default function MobileMenu({
   onToggleViewMode,
   onOpenStats,
   onOpenDataHealth,
+  onOpenFeatures,
   onSignOut,
   userEmail,
   userPicture,
@@ -101,6 +102,9 @@ export default function MobileMenu({
               </div>
               <button type="button" role="menuitem" onClick={() => { onToggleViewMode(); close(); }}>
                 <GitBranch size={15} /> {viewMode === 'forest' ? 'Pedigree View' : 'Full Tree View'}
+              </button>
+              <button type="button" role="menuitem" onClick={() => { onOpenFeatures(); close(); }}>
+                <Compass size={15} /> Demo
               </button>
               <button type="button" role="menuitem" className="mobile-menu-signout" onClick={() => { onSignOut(); close(); }}>
                 <LogOut size={15} /> Sign Out

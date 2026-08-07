@@ -6,8 +6,93 @@
 
 .attach-step-hint {
   margin: 0;
+  /* Modal's close button sits at top:12px/right:12px, 32px wide — this modal's
+     content starts immediately with this hint (no title bar above it to give
+     the corner natural clearance, unlike e.g. ConfirmDialog's icon), so without
+     this the first line of text runs straight under the button. */
+  padding-right: 40px;
   font-size: 0.92rem;
   color: var(--color-text-muted, var(--color-text));
+}
+
+.attach-anchor-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 40px 4px;
+}
+
+.attach-anchor-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Same visual language as TreeNode's own .mini-card-add "+" badge — sitting on
+   the avatar ring's lower edge — so this reads as the exact same add-relative
+   action, not a wizard-only lookalike. */
+.attach-anchor-add-badge {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: linear-gradient(145deg, var(--color-surface), var(--color-surface-primary-tint));
+  color: var(--color-primary);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: var(--shadow-md);
+}
+
+.attach-anchor-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: center;
+}
+
+/* Same look as TreeNode's .mini-card-menu dropdown, just pre-expanded and laid
+   out in normal flow (rather than position:absolute-anchored to a specific
+   canvas card) — there's only ever one of these on screen here, so it doesn't
+   need to float free of the modal's own layout. */
+.attach-relation-menu {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 220px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.attach-relation-menu button {
+  border: none;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font);
+  font-size: 13px;
+  text-align: left;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+}
+
+.attach-relation-menu button:not(:last-child) {
+  border-bottom: 1px solid var(--color-border);
+}
+
+@media (hover: hover) {
+  .attach-relation-menu button:hover {
+    background: var(--color-bg);
+    color: var(--color-primary);
+  }
 }
 
 .attach-search-input {
@@ -52,47 +137,6 @@
   margin: 0;
   font-size: 0.88rem;
   color: var(--color-text-muted, var(--color-text));
-}
-
-.attach-this-is-me-btn {
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid var(--color-primary);
-  background: rgba(var(--color-primary-rgb), 0.1);
-  color: var(--color-primary);
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-@media (hover: hover) {
-  .attach-this-is-me-btn:hover {
-    background: var(--color-primary);
-    color: #fff;
-  }
-}
-
-.attach-relation-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.attach-relation-options button {
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-@media (hover: hover) {
-  .attach-relation-options button:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-  }
 }
 
 .attach-back-btn {
