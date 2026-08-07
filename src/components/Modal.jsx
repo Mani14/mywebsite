@@ -72,9 +72,16 @@ export default function Modal({ isOpen, onClose, title, children, width, classNa
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
           >
-            <button type="button" className="modal-close" aria-label="Close" onClick={onClose}>
-              <X size={18} />
-            </button>
+            {/* Zero-height sticky anchor so the close button stays pinned to the
+                top-right of the VISIBLE scroll area — .modal-surface itself is the
+                scrolling element, so a plain absolutely-positioned button (the old
+                approach) scrolls away with the content on any modal tall enough to
+                scroll, e.g. Family Statistics with a long names list expanded. */}
+            <div className="modal-close-anchor">
+              <button type="button" className="modal-close" aria-label="Close" onClick={onClose}>
+                <X size={18} />
+              </button>
+            </div>
             {children}
           </motion.div>
         </motion.div>
