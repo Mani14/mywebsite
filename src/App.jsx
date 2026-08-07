@@ -17,6 +17,7 @@ import ThemeToggle from './components/ThemeToggle';
 import StatsPanel from './components/StatsPanel';
 import DataHealthPanel from './components/DataHealthPanel';
 import MobileMenu from './components/MobileMenu';
+import ConfirmDialog from './components/ConfirmDialog';
 import {
   getPerson,
   getFullName,
@@ -205,6 +206,30 @@ export default function App() {
     if (Object.keys(updates).length > 0) updatePerson(personId, updates);
   }, [setMe, persons, user, updatePerson, meId]);
 
+  // A single deliberate confirm step (see ConfirmDialog) shared by both "Mark as
+  // Me" and Delete — actions that are hard to walk back and shouldn't fire off a
+  // single stray click. Un-linking "me" (personId === null) skips it: that's just
+  // undoing a link, not creating a new one, and is trivially reversible by picking
+  // the right person again.
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const closeConfirmDialog = useCallback(() => setConfirmDialog(null), []);
+  const requestSetMe = useCallback((personId) => {
+    if (!personId) {
+      handleSetMe(null);
+      return;
+    }
+    const person = getPerson(persons, personId);
+    setConfirmDialog({
+      title: 'Mark as Me?',
+      message: `This links your signed-in account to ${getFullName(person)} — it'll fill in your photo/email on their profile (without overwriting anything already there) and mark it as your verified identity in the tree.`,
+      confirmLabel: 'Mark as Me',
+      onConfirm: () => {
+        handleSetMe(personId);
+        setConfirmDialog(null);
+      },
+    });
+  }, [persons, handleSetMe]);
+
   // Backfills photo/email/verifiedEmail for people already linked as "me" before this
   // sync existed — runs once per sign-in/data-load rather than only at the moment of linking.
   useEffect(() => {
@@ -332,15 +357,26 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-  const handleDelete = useCallback((id) => {
-    const person = getPerson(persons, id);
-    const name = person ? getFullName(person) : 'this person';
-    if (!window.confirm(`Delete ${name}? This cannot be undone.`)) return;
-    if (!window.confirm(`Are you sure you want to permanently delete ${name}? This also removes their links to parents, spouse, and children.`)) return;
+  const performDelete = useCallback((id) => {
     deletePerson(id);
     setSelectedId((prev) => (prev === id ? null : prev));
     setFocusId((prev) => (prev === id ? null : prev));
-  }, [deletePerson, persons]);
+  }, [deletePerson]);
+
+  const handleDelete = useCallback((id) => {
+    const person = getPerson(persons, id);
+    const name = person ? getFullName(person) : 'this person';
+    setConfirmDialog({
+      title: `Delete ${name}?`,
+      message: `This permanently removes ${name} and their links to parents, spouse, and children. This cannot be undone (though it's still covered by Undo, until you close the app).`,
+      confirmLabel: 'Delete',
+      danger: true,
+      onConfirm: () => {
+        performDelete(id);
+        setConfirmDialog(null);
+      },
+    });
+  }, [persons, performDelete]);
 
   // Uncollapses every ancestor of a person so a search jump always lands on a visible node.
   const revealAncestors = useCallback((id) => {
@@ -727,7 +763,7 @@ export default function App() {
               anchorContext={relationshipAnchorContext}
               isHighlighted={highlightedIds.has(selected.id)}
               meId={meId}
-              onSetMe={handleSetMe}
+              onSetMe={requestSetMe}
               onClose={closeDetail}
               onNavigate={handleSelect}
               onEdit={() => setFormState({ mode: 'edit', personId: selected.id })}
@@ -785,6 +821,18 @@ export default function App() {
           fromId={findConnectionFromId}
           onPick={handleConnectionPicked}
           onCancel={() => setFindConnectionFromId(null)}
+        />
+      )}
+
+      {confirmDialog && (
+        <ConfirmDialog
+          isOpen
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          confirmLabel={confirmDialog.confirmLabel}
+          danger={confirmDialog.danger}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={closeConfirmDialog}
         />
       )}
 
