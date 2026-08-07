@@ -197,6 +197,14 @@
   margin-bottom: 4px;
 }
 
+.detail-relation-hint {
+  text-transform: none;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  opacity: 0.75;
+  margin-left: 6px;
+}
+
 .detail-relation-links {
   display: flex;
   flex-wrap: wrap;

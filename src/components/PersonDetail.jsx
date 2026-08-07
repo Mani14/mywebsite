@@ -24,7 +24,12 @@ function RelationList({ title, people, onNavigate, onUnlink, onReorder }) {
   if (people.length === 0) return null;
   return (
     <div className="detail-relation">
-      <span className="detail-relation-title">{title}</span>
+      <span className="detail-relation-title">
+        {title}
+        {onReorder && people.length > 1 && (
+          <span className="detail-relation-hint">— use ▲▼ to reorder</span>
+        )}
+      </span>
       <div className="detail-relation-links">
         {people.map((p, index) => (
           <span key={p.id} className="detail-link-row">
