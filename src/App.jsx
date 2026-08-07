@@ -416,6 +416,10 @@ export default function App() {
       window.alert('No direct blood or marriage connection found between these two people.');
       return;
     }
+    // Close whichever detail panel is still open (the "from" person's, left over
+    // from before Find Connection was opened) so the travel animation is visible
+    // full-canvas immediately, instead of partly covered until manually dismissed.
+    setSelectedId(null);
     setHighlightedChain(path);
     setConnectionResult({ fromId, toId });
     handleTravelPath(path);
