@@ -9,3 +9,8 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+
+# Firebase CLI (local deploy cache/logs — never anything secret, but noisy)
+.firebase
+firebase-debug.log
+firebase-debug.*.log
