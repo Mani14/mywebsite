@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { BadgeCheck, Baby, Briefcase, Cake, Crown, GitBranch, HeartHandshake, Mail, MapPin, PartyPopper, Pencil, Phone, Sparkles, Trash2, UserPlus, Users, X, XCircle } from 'lucide-react';
+import { BadgeCheck, Baby, Briefcase, Cake, ChevronDown, ChevronUp, Crown, GitBranch, HeartHandshake, Mail, MapPin, PartyPopper, Pencil, Phone, Sparkles, Trash2, UserPlus, Users, X, XCircle } from 'lucide-react';
 import {
   formatDateDisplay,
   getAgeInfo,
@@ -10,19 +10,46 @@ import {
   getInitials,
   getParents,
   getRelationshipLabel,
+  getRelationshipLabelTamil,
   getSiblings,
   getSpouse,
 } from '../utils/familyUtils';
 import '../styles/PersonDetail.css';
 
-function RelationList({ title, people, onNavigate, onUnlink }) {
+// `onReorder` (Children only — order is meaningless for Spouse/Parents/Siblings)
+// moves a child earlier/later among ITS OWN siblings, kept in sync across every
+// one of the child's recorded parents (see useFamily's reorderChild) — the only
+// way to capture birth order when exact DOB isn't known.
+function RelationList({ title, people, onNavigate, onUnlink, onReorder }) {
   if (people.length === 0) return null;
   return (
     <div className="detail-relation">
       <span className="detail-relation-title">{title}</span>
       <div className="detail-relation-links">
-        {people.map((p) => (
+        {people.map((p, index) => (
           <span key={p.id} className="detail-link-row">
+            {onReorder && (
+              <span className="detail-reorder">
+                <button
+                  type="button"
+                  className="detail-reorder-btn"
+                  disabled={index === 0}
+                  title={`Move ${getFullName(p)} earlier`}
+                  onClick={() => onReorder(p.id, 'up')}
+                >
+                  <ChevronUp size={12} />
+                </button>
+                <button
+                  type="button"
+                  className="detail-reorder-btn"
+                  disabled={index === people.length - 1}
+                  title={`Move ${getFullName(p)} later`}
+                  onClick={() => onReorder(p.id, 'down')}
+                >
+                  <ChevronDown size={12} />
+                </button>
+              </span>
+            )}
             <button type="button" className="detail-link" onClick={() => onNavigate(p.id)}>
               {getFullName(p)}
             </button>
@@ -65,6 +92,7 @@ export default function PersonDetail({
   onUnlinkSpouse,
   onUnlinkParent,
   onUnlinkChild,
+  onReorderChild,
   onHighlightLineage,
   onClearHighlight,
 }) {
@@ -76,7 +104,10 @@ export default function PersonDetail({
   const siblings = getSiblings(persons, person);
   const ageInfo = getAgeInfo(person);
   const baseRelationship = anchorId ? getRelationshipLabel(persons, person.id, anchorId) : null;
-  const relationshipLabel = baseRelationship ? `${baseRelationship} (to ${anchorContext})` : null;
+  const tamilRelationship = anchorId ? getRelationshipLabelTamil(persons, person.id, anchorId) : null;
+  const relationshipLabel = baseRelationship
+    ? `${tamilRelationship ? `${tamilRelationship} · ` : ''}${baseRelationship} (to ${anchorContext})`
+    : null;
   const daysUntilBirthday = person.isAlive ? getDaysUntilBirthday(person.dob) : null;
   const stats = getFamilyStats(persons, person);
   const hasStats = stats && (stats.childrenCount > 0 || stats.grandchildrenCount > 0 || stats.siblingsCount > 0);
@@ -170,7 +201,13 @@ export default function PersonDetail({
           onUnlink={onUnlinkSpouse}
         />
         <RelationList title="Parents" people={parents} onNavigate={onNavigate} onUnlink={onUnlinkParent} />
-        <RelationList title="Children" people={children} onNavigate={onNavigate} onUnlink={onUnlinkChild} />
+        <RelationList
+          title="Children"
+          people={children}
+          onNavigate={onNavigate}
+          onUnlink={onUnlinkChild}
+          onReorder={onReorderChild}
+        />
         <RelationList title="Siblings" people={siblings} onNavigate={onNavigate} />
       </div>
 

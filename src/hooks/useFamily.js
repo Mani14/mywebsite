@@ -382,6 +382,34 @@ export function useFamily() {
     });
   }, [pushHistory]);
 
+  // Moves a child one slot earlier/later among its siblings — kept in sync across
+  // EVERY one of the child's recorded parents (not just whichever parent's detail
+  // panel triggered this), since both should agree on birth order. This is the
+  // only place birth order is captured when exact DOB isn't known: childrenIds
+  // array order doubles as both left-to-right tree position and, for the Tamil
+  // elder/younger terms, birth order (eldest first).
+  const reorderChild = useCallback((childId, direction) => {
+    pushHistory();
+    setPersons((prev) => {
+      const child = prev[childId];
+      if (!child) return prev;
+      const next = { ...prev };
+      let moved = false;
+      child.parentIds.forEach((parentId) => {
+        const parent = next[parentId];
+        if (!parent) return;
+        const ids = [...parent.childrenIds];
+        const idx = ids.indexOf(childId);
+        const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+        if (idx === -1 || swapIdx < 0 || swapIdx >= ids.length) return;
+        [ids[idx], ids[swapIdx]] = [ids[swapIdx], ids[idx]];
+        next[parentId] = { ...parent, childrenIds: ids };
+        moved = true;
+      });
+      return moved ? next : prev;
+    });
+  }, [pushHistory]);
+
   const setRoot = useCallback((id) => {
     setRootPersonId((prev) => (persons[id] ? id : prev));
   }, [persons]);
@@ -435,6 +463,7 @@ export function useFamily() {
     removeSpouse,
     removeParent,
     removeChild,
+    reorderChild,
     setRoot,
     replaceAll,
     resetToSeed,

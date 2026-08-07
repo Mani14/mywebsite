@@ -219,11 +219,22 @@
   transition: border-color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
-/* Only flatten the right edge when an unlink "x" button actually follows (Spouse/
-   Parents/Children) — Siblings has no unlink button, so without this guard its pill
-   was left with a rounded left edge and a flat, borderless right edge (looked like a
-   half-finished rectangle instead of a pill). */
-.detail-link-row:has(.detail-unlink) .detail-link {
+/* Only flatten an edge when a control actually sits on that side, so the pill
+   reads as one continuous control with whatever's attached to it — reorder
+   arrows (Children only) on the left, an unlink "x" (Spouse/Parents/Children) on
+   the right. Siblings has neither, so it stays a plain, fully-rounded pill. */
+.detail-link-row:has(.detail-reorder):has(.detail-unlink) .detail-link {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+}
+
+.detail-link-row:has(.detail-reorder):not(:has(.detail-unlink)) .detail-link {
+  border-radius: 0 999px 999px 0;
+  border-left: none;
+}
+
+.detail-link-row:has(.detail-unlink):not(:has(.detail-reorder)) .detail-link {
   border-radius: 999px 0 0 999px;
   border-right: none;
 }
@@ -232,6 +243,46 @@
   .detail-link:hover {
     border-color: var(--color-primary);
     box-shadow: var(--shadow-sm);
+  }
+}
+
+/* Move a child earlier/later among their siblings — the two arrows stack into the
+   same height as the name pill so the row reads as one continuous control. */
+.detail-reorder {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-right: none;
+  border-radius: 999px 0 0 999px;
+  overflow: hidden;
+}
+
+.detail-reorder-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 15px;
+  padding: 0;
+  border: none;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.detail-reorder-btn:first-child {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-reorder-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) {
+  .detail-reorder-btn:not(:disabled):hover {
+    background: var(--color-surface);
+    color: var(--color-primary);
   }
 }
 

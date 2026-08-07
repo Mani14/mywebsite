@@ -40,6 +40,7 @@ export default function App() {
     removeSpouse,
     removeParent,
     removeChild,
+    reorderChild,
     replaceAll,
     exportData,
     undo,
@@ -620,6 +621,7 @@ export default function App() {
               onUnlinkSpouse={handleUnlinkSpouse}
               onUnlinkParent={handleUnlinkParent}
               onUnlinkChild={handleUnlinkChild}
+              onReorderChild={reorderChild}
               onHighlightLineage={handleHighlightLineage}
               onClearHighlight={handleClearHighlight}
             />

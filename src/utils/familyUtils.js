@@ -573,7 +573,7 @@ function commonAncestor(persons, aId, bId) {
   for (const [ancestorId, distA] of aAncestors) {
     const distB = bAncestors.get(ancestorId);
     if (distB == null) continue;
-    if (!best || distA + distB < best.distA + best.distB) best = { distA, distB };
+    if (!best || distA + distB < best.distA + best.distB) best = { distA, distB, ancestorId };
   }
   return best;
 }
@@ -704,6 +704,334 @@ export function getRelationshipLabel(persons, personId, rootId) {
     bloodLabel(persons, personId, rootId, male, female),
     inLawLabel(persons, personId, rootId, male, female),
   ].filter(Boolean);
+  return parts.length ? parts.join(' / ') : null;
+}
+
+// --- Tamil relationship terms ----------------------------------------------
+// Tamil kinship terms are more granular than the English labels above: they
+// distinguish paternal from maternal relatives (Mama = mother's brother vs.
+// Chithappa = father's younger brother) and elder from younger (Anna vs. Thambi)
+// — neither of which English marks at all, so those have to be worked out
+// separately here rather than just translating the English word. Where that
+// isn't possible (birth order can't be determined) or a specific family/regional
+// convention would matter (cousins beyond 1st, several in-law directions), this
+// falls back to a plain descriptive phrase instead of guessing a specific term —
+// those are the spots most worth double-checking against your own family's usage.
+
+// 'elder' | 'younger' | null — from idA/idB's position in `ancestorId`'s own
+// childrenIds (both are always children of ancestorId at the call sites below —
+// a sibling pair, or an uncle/aunt alongside the parent connecting them to root),
+// NOT from DOB: DOB is frequently missing or, worse, an accidental placeholder
+// value (e.g. the date the record was created) rather than a real birthdate,
+// which reads as confidently wrong instead of just absent. childrenIds order is
+// exactly what useFamily's reorderChild (the up/down arrows on the Children
+// list) lets you set directly, so it's the more trustworthy signal to use.
+function tamilBirthOrder(persons, ancestorId, idA, idB) {
+  const ancestor = getPerson(persons, ancestorId);
+  if (!ancestor) return null;
+  const idxA = ancestor.childrenIds.indexOf(idA);
+  const idxB = ancestor.childrenIds.indexOf(idB);
+  if (idxA === -1 || idxB === -1 || idxA === idxB) return null;
+  return idxA < idxB ? 'elder' : 'younger';
+}
+
+// Whether `ancestorId` is reached from `referenceId` via their father or mother —
+// needed because Tamil uncle/aunt terms depend on which side of the family
+// they're on, something English "uncle"/"aunt" doesn't track at all. Takes a
+// generic `referenceId` (not always rootId) because the same check is also
+// needed relative to root's SPOUSE (addressing your spouse's uncle/aunt).
+function tamilSideFromRoot(persons, referenceId, ancestorId) {
+  const reference = getPerson(persons, referenceId);
+  if (!reference) return null;
+  const [fatherId, motherId] = reference.parentIds;
+  const viaFather = fatherId ? ancestorDistances(persons, fatherId).has(ancestorId) : false;
+  const viaMother = motherId ? ancestorDistances(persons, motherId).has(ancestorId) : false;
+  if (viaFather && !viaMother) return 'paternal';
+  if (viaMother && !viaFather) return 'maternal';
+  return null;
+}
+
+// The direct child of `ancestorId` lying on the path down to `descendantId`
+// (which is `totalDist` steps below the ancestor) — e.g. for a nephew this finds
+// root's own sibling (the nephew's parent, whose gender picks the right term);
+// for an uncle, this finds root's own parent (the uncle's sibling), so it can be
+// checked for birth order against them; for a 1st cousin, this finds each side's
+// own connecting parent, to tell a cross-cousin from a parallel one.
+function tamilConnectingChild(persons, ancestorId, descendantId, totalDist) {
+  const ancestor = getPerson(persons, ancestorId);
+  if (!ancestor || totalDist < 1) return null;
+  const distances = ancestorDistances(persons, descendantId);
+  return ancestor.childrenIds.find((cid) => distances.get(cid) === totalDist - 1) || null;
+}
+
+// Periyappa/Periyamma (elder-uncle pair), Chithappa/Chithi (younger-uncle pair),
+// or Mama/Athai (cross-sibling pair) — ONE pair covers both the blood relative
+// and their in-law spouse: father's elder brother is Periyappa, and HIS WIFE is
+// also Periyamma (not a separate "aunt-in-law" word); mother's brother is Mama,
+// and HIS WIFE is Athai (the same word as father's own sister). Which pair
+// applies is decided by `bloodRelativeId` (whoever is actually blood-related to
+// `referenceId`); which half of that pair is returned is just personGender —
+// so this works whether `personId`/`bloodRelativeId` are the same person (a
+// direct blood uncle/aunt) or personId is married to bloodRelativeId (an in-law
+// uncle/aunt by marriage).
+function tamilUncleAuntPairTerm(persons, referenceId, ancestorId, bloodRelativeId, personGender) {
+  const bloodRelative = getPerson(persons, bloodRelativeId);
+  if (!bloodRelative) return null;
+  const side = tamilSideFromRoot(persons, referenceId, ancestorId);
+  const connectingParent = tamilConnectingChild(persons, ancestorId, referenceId, 2);
+  const order = connectingParent ? tamilBirthOrder(persons, ancestorId, bloodRelativeId, connectingParent) : null;
+  const bloodGender = bloodRelative.gender;
+
+  const sameSide = (side === 'paternal' && bloodGender === 'male') || (side === 'maternal' && bloodGender === 'female');
+  const crossSide = (side === 'paternal' && bloodGender === 'female') || (side === 'maternal' && bloodGender === 'male');
+
+  if (crossSide) {
+    if (personGender === 'male') return 'மாமா';
+    if (personGender === 'female') return 'அத்தை';
+    return 'மாமா/அத்தை';
+  }
+  if (sameSide) {
+    if (order === 'elder') return personGender === 'male' ? 'பெரியப்பா' : personGender === 'female' ? 'பெரியம்மா' : 'பெரியப்பா/பெரியம்மா';
+    if (order === 'younger') return personGender === 'male' ? 'சித்தப்பா' : personGender === 'female' ? 'சித்தி' : 'சித்தப்பா/சித்தி';
+    return personGender === 'male' ? 'பெரியப்பா/சித்தப்பா' : personGender === 'female' ? 'பெரியம்மா/சித்தி' : null;
+  }
+  // Side couldn't be determined at all (e.g. root has no recorded parents).
+  return personGender === 'male' ? 'பெரியப்பா/சித்தப்பா/மாமா' : personGender === 'female' ? 'பெரியம்மா/சித்தி/அத்தை' : null;
+}
+
+function tamilBloodLabelFromDistances(persons, personId, rootId, distPerson, distRoot, male, female, ancestorId) {
+  // root is the common ancestor: person descends from root.
+  if (distRoot === 0) {
+    if (distPerson === 1) return male ? 'மகன்' : female ? 'மகள்' : 'குழந்தை';
+    if (distPerson === 2) return male ? 'பேரன்' : female ? 'பேத்தி' : 'பேரக்குழந்தை';
+    if (distPerson === 3) return male ? 'கொள்ளுப்பேரன்' : female ? 'கொள்ளுப்பேத்தி' : 'கொள்ளுப்பேரக்குழந்தை';
+    return `${distPerson - 2}x கொள்ளுப்பேரன்/பேத்தி`;
+  }
+  // person is the common ancestor: root descends from person.
+  if (distPerson === 0) {
+    if (distRoot === 1) return male ? 'அப்பா' : female ? 'அம்மா' : 'பெற்றோர்';
+    if (distRoot === 2) return male ? 'தாத்தா' : female ? 'பாட்டி' : 'பாட்டன்/பாட்டி';
+    if (distRoot === 3) return male ? 'கொள்ளுத்தாத்தா' : female ? 'கொள்ளுப்பாட்டி' : 'கொள்ளுத்தாத்தா/பாட்டி';
+    return `${distRoot - 2}x கொள்ளுத்தாத்தா/பாட்டி`;
+  }
+  // Same generation from the shared ancestor: siblings or cousins.
+  if (distRoot === distPerson) {
+    if (distRoot === 1) {
+      const order = tamilBirthOrder(persons, ancestorId, personId, rootId);
+      if (male) return order === 'elder' ? 'அண்ணா' : order === 'younger' ? 'தம்பி' : 'சகோதரன்';
+      if (female) return order === 'elder' ? 'அக்கா' : order === 'younger' ? 'தங்கை' : 'சகோதரி';
+      return 'உடன்பிறப்பு';
+    }
+    if (distRoot === 2) {
+      // 1st cousins: through two siblings of OPPOSITE gender (a brother-sister
+      // pair) is a cross-cousin — Machaan/Machinichi, traditionally marriage-
+      // eligible; through two siblings of the SAME gender (two brothers, or two
+      // sisters) is a parallel cousin — Tamil just treats them as a sibling
+      // (Anna/Thambi/Akka/Thangai), using the connecting parents' own relative
+      // order as a stand-in for which cousin branch counts as "elder".
+      const rootParent = tamilConnectingChild(persons, ancestorId, rootId, 2);
+      const personParent = tamilConnectingChild(persons, ancestorId, personId, 2);
+      const rootParentGender = rootParent ? getPerson(persons, rootParent)?.gender : null;
+      const personParentGender = personParent ? getPerson(persons, personParent)?.gender : null;
+      if (rootParentGender && personParentGender) {
+        if (rootParentGender !== personParentGender) {
+          return male ? 'மைத்துனன்/மச்சான்' : female ? 'மைத்துனி/மச்சினிச்சி' : 'மச்சான்/மச்சினிச்சி';
+        }
+        const order = tamilBirthOrder(persons, ancestorId, personParent, rootParent);
+        if (male) return order === 'elder' ? 'அண்ணா' : order === 'younger' ? 'தம்பி' : 'சகோதரன்';
+        if (female) return order === 'elder' ? 'அக்கா' : order === 'younger' ? 'தங்கை' : 'சகோதரி';
+      }
+    }
+    // Cousins beyond 1st, or 1st cousins whose branch couldn't be pinned down —
+    // Tamil doesn't cleanly number "2nd/3rd cousin" the way English does either.
+    return male ? 'ஒன்று விட்ட சகோதரன்' : female ? 'ஒன்று விட்ட சகோதரி' : 'ஒன்று விட்ட உறவினர்';
+  }
+  // Different generations, neither is the other's direct ancestor.
+  if (distRoot < distPerson) {
+    // Nephew/niece: root's sibling's child. It's not just the connecting
+    // sibling's gender that matters, but whether it MATCHES root's own gender —
+    // your own-gender sibling's kids are basically your own (Magan/Magal); it's
+    // specifically your OPPOSITE-gender sibling's kids that become
+    // Marumagan/Marumagal (the cross-cousin-marriage-eligible word, shared with
+    // son/daughter-in-law).
+    if (distRoot === 1 && distPerson === 2) {
+      const connecting = tamilConnectingChild(persons, ancestorId, personId, distPerson);
+      const connectingGender = connecting ? getPerson(persons, connecting)?.gender : null;
+      const rootGender = getPerson(persons, rootId)?.gender;
+      if (connectingGender && rootGender) {
+        if (connectingGender !== rootGender) return male ? 'மருமகன்' : female ? 'மருமகள்' : 'மருமகன்/மருமகள்';
+        return male ? 'மகன்' : female ? 'மகள்' : 'மகன்/மகள்';
+      }
+      return male ? 'சகோதரன்/சகோதரியின் மகன்' : female ? 'சகோதரன்/சகோதரியின் மகள்' : 'சகோதரன்/சகோதரியின் குழந்தை';
+    }
+    if (distRoot === 1) return male ? 'தொலைவு மருமகன்' : female ? 'தொலைவு மருமகள்' : 'தொலைவு மருமகன்/மருமகள்';
+    return male ? 'ஒன்று விட்ட சகோதரன்' : female ? 'ஒன்று விட்ட சகோதரி' : 'ஒன்று விட்ட உறவினர்';
+  }
+  // distPerson < distRoot: person is root's parent's sibling (uncle/aunt) or further.
+  if (distPerson === 1 && distRoot === 2) {
+    return tamilUncleAuntPairTerm(persons, rootId, ancestorId, personId, male ? 'male' : female ? 'female' : null);
+  }
+  if (distPerson === 1) {
+    return male ? 'பாட்டனாரின்/பாட்டியின் சகோதரர்' : female ? 'பாட்டனாரின்/பாட்டியின் சகோதரி' : 'பாட்டன்/பாட்டி வழி உறவினர்';
+  }
+  return male ? 'ஒன்று விட்ட சகோதரன்' : female ? 'ஒன்று விட்ட சகோதரி' : 'ஒன்று விட்ட உறவினர்';
+}
+
+// person's spouse is a direct child/grandchild of root — mappillai/marumagal
+// (son/daughter-in-law) and further down. Unaffected by the uncle/aunt pair
+// rework above (root IS the blood ancestor here, no side/cross logic applies).
+function tamilInLawTermMarriedIn(distSP, distRoot, male, female) {
+  if (distSP === 1) return male ? 'மாப்பிள்ளை' : female ? 'மருமகள்' : 'மாப்பிள்ளை/மருமகள்';
+  if (distSP === 2) return male ? 'பேரன் மாப்பிள்ளை' : female ? 'பேத்தி மருமகள்' : 'பேரன்/பேத்தி வழி மணமகன்/மகள்';
+  return male ? 'தொலைவு மாப்பிள்ளை' : female ? 'தொலைவு மருமகள்' : 'தொலைவு மணமகன்/மகள்';
+}
+
+// root's own sibling married `person` — Anni (elder brother's wife) or
+// Aththaan/Machaan (elder sister's husband) specifically; a YOUNGER sibling's
+// spouse doesn't have a standard word I could confirm, so that (and an unknown
+// birth order) falls back to a plain descriptive phrase instead of guessing.
+function tamilSiblingSpouseTerm(persons, ancestorId, rootId, siblingId, personGender) {
+  const sibling = getPerson(persons, siblingId);
+  if (!sibling) return null;
+  const order = tamilBirthOrder(persons, ancestorId, siblingId, rootId);
+  if (sibling.gender === 'male' && personGender === 'female') {
+    return order === 'elder' ? 'அண்ணி' : order === 'younger' ? 'தம்பியின் மனைவி' : 'சகோதரனின் மனைவி';
+  }
+  if (sibling.gender === 'female' && personGender === 'male') {
+    return order === 'elder' ? 'அத்தான்/மாச்சான்' : order === 'younger' ? 'தங்கையின் கணவர்' : 'சகோதரியின் கணவர்';
+  }
+  return null;
+}
+
+// True if root's CHILD is married to person's CHILD — the connection between
+// the two sets of in-laws themselves, not between root and person's own blood
+// lines. Neither root nor person is a blood relative of the other at all here.
+function tamilIsSambandhi(persons, personId, rootId) {
+  const root = getPerson(persons, rootId);
+  if (!root) return false;
+  return root.childrenIds.some((childId) => {
+    const child = getPerson(persons, childId);
+    const childSpouse = child?.spouseId ? getPerson(persons, child.spouseId) : null;
+    return !!childSpouse?.parentIds.includes(personId);
+  });
+}
+
+// root and person are both married INTO the same sibling group — Orambadi/
+// Sagalai for two men married to sisters, Oppandhiyaar for two women married
+// to brothers. (Mixed-gender pairs married to opposite-gender siblings are
+// already covered elsewhere — e.g. husband's-brother's-wife is Anni via a
+// different path — so this only fires for the two matching-gender cases.)
+function tamilCoSiblingInLawTerm(persons, personId, rootId, rootGender, personGender) {
+  const root = getPerson(persons, rootId);
+  const person = getPerson(persons, personId);
+  if (!root?.spouseId || !person?.spouseId || root.spouseId === personId || person.spouseId === rootId) return null;
+  const ca = commonAncestor(persons, root.spouseId, person.spouseId);
+  if (!ca || ca.distA !== 1 || ca.distB !== 1) return null;
+  if (rootGender === 'male' && personGender === 'male') return 'ஓரம்படி/சகலை';
+  if (rootGender === 'female' && personGender === 'female') return 'ஓப்பந்தியார்';
+  return null;
+}
+
+// Marriage-based (in-law) Tamil term — mirrors inLawLabel's two-direction
+// structure (person married into root's family, or person is kin of root's own
+// spouse), plus two relationship types that aren't a "one marriage hop from a
+// blood tie" at all: Sambandhi (the connection between root's and person's own
+// families once their children marry each other) and co-sibling-in-law
+// (Orambadi/Oppandhiyaar, two people married into the same sibling group).
+function tamilInLawLabel(persons, personId, rootId, male, female) {
+  const person = getPerson(persons, personId);
+  const root = getPerson(persons, rootId);
+  if (!person || !root) return null;
+  const personGender = male ? 'male' : female ? 'female' : null;
+  const candidates = [];
+
+  // person's spouse is blood-related to root (person married INTO root's family).
+  if (person.spouseId && person.spouseId !== rootId) {
+    const spouse = getPerson(persons, person.spouseId);
+    const ca = commonAncestor(persons, person.spouseId, rootId);
+    if (ca && spouse) {
+      const { distA: distSP, distB: distRoot, ancestorId } = ca;
+      let term = null;
+      if (distRoot === 0) {
+        term = tamilInLawTermMarriedIn(distSP, distRoot, male, female);
+      } else if (distRoot === 1 && distSP === 1) {
+        term = tamilSiblingSpouseTerm(persons, ancestorId, rootId, person.spouseId, personGender);
+      } else if (distSP === 1 && distRoot === 2) {
+        term = tamilUncleAuntPairTerm(persons, rootId, ancestorId, person.spouseId, personGender);
+      } else if (distSP === 1 && distRoot > 2) {
+        term = personGender === 'male' ? 'தொலைவு மாமா' : personGender === 'female' ? 'தொலைவு அத்தை' : null;
+      }
+      if (term) candidates.push({ term, cost: distSP + distRoot });
+    }
+  }
+
+  // person is blood-related to root's own spouse (root married INTO person's family).
+  if (root.spouseId && root.spouseId !== personId) {
+    const ca = commonAncestor(persons, personId, root.spouseId);
+    if (ca) {
+      const { distA: distPersonToAnc, distB: distRS, ancestorId } = ca;
+      let term = null;
+      if (distPersonToAnc === 0) {
+        if (distRS === 1) term = male ? 'மாமனார்' : female ? 'மாமியார்' : 'மாமனார்/மாமியார்';
+        else term = 'பாட்டன்/பாட்டி வழி';
+      } else if (distPersonToAnc === 1 && distRS === 1) {
+        const order = tamilBirthOrder(persons, ancestorId, personId, root.spouseId);
+        if (root.gender === 'male') {
+          // root is the husband; person is his wife's sibling.
+          if (personGender === 'male') term = order === 'younger' ? 'மைத்துனர்/கொழுந்தன்' : 'மனைவியின் சகோதரர்';
+          if (personGender === 'female') term = order === 'younger' ? 'மச்சினி' : 'மனைவியின் சகோதரி';
+        } else if (root.gender === 'female') {
+          // root is the wife; person is her husband's sibling.
+          if (personGender === 'male') term = order === 'younger' ? 'கொழுந்தனார்' : 'கணவரின் சகோதரர்';
+          if (personGender === 'female') term = 'நாத்தனார்';
+        }
+      } else if (distPersonToAnc === 1 && distRS === 2) {
+        term = tamilUncleAuntPairTerm(persons, root.spouseId, ancestorId, personId, personGender);
+      } else if (distPersonToAnc === 1 && distRS > 2) {
+        term = personGender === 'male' ? 'தொலைவு மாமா' : personGender === 'female' ? 'தொலைவு அத்தை' : null;
+      }
+      if (term) candidates.push({ term, cost: distPersonToAnc + distRS });
+    }
+  }
+
+  if (tamilIsSambandhi(persons, personId, rootId) || tamilIsSambandhi(persons, rootId, personId)) {
+    candidates.push({ term: 'சம்பந்தி', cost: 4 });
+  }
+
+  const coTerm = tamilCoSiblingInLawTerm(persons, personId, rootId, root.gender, person.gender);
+  if (coTerm) candidates.push({ term: coTerm, cost: 4 });
+
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => a.cost - b.cost);
+  return candidates[0].term;
+}
+
+// Tamil counterpart to getRelationshipLabel — same structure (blood label, in-law
+// label, joined with " / " if both apply), but in Tamil terms that track side and
+// birth order where English doesn't. Meant to be shown ALONGSIDE the English
+// label (before it), not as a replacement — see PersonDetail's relationshipLabel.
+export function getRelationshipLabelTamil(persons, personId, rootId) {
+  if (!personId || !rootId || personId === rootId) return null;
+  const person = getPerson(persons, personId);
+  const root = getPerson(persons, rootId);
+  if (!person || !root) return null;
+
+  if (person.spouseId === rootId) {
+    if (person.gender === 'male') return 'கணவர்';
+    if (person.gender === 'female') return 'மனைவி';
+    return 'வாழ்க்கைத் துணை';
+  }
+
+  const male = person.gender === 'male';
+  const female = person.gender === 'female';
+
+  const ca = commonAncestor(persons, personId, rootId);
+  const blood = ca
+    ? tamilBloodLabelFromDistances(persons, personId, rootId, ca.distA, ca.distB, male, female, ca.ancestorId)
+    : null;
+  const inLaw = tamilInLawLabel(persons, personId, rootId, male, female);
+
+  const parts = [blood, inLaw].filter(Boolean);
   return parts.length ? parts.join(' / ') : null;
 }
 
