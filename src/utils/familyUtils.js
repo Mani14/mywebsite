@@ -1116,6 +1116,47 @@ export function getAncestorChain(persons, personId) {
   return chain;
 }
 
+// Full ordered chain of ids connecting idA to idB, for the "Find Connection"
+// path highlight/travel feature — a plain shortest-path BFS over the WHOLE
+// family graph, where every parent/child AND spouse link is a traversable edge.
+// This is deliberately not "find the common ancestor" — two people are very
+// often connected only through a marriage that sits somewhere in the MIDDLE of
+// the path (e.g. two people whose families are linked because a cousin on one
+// side married a cousin on the other), not through a shared blood ancestor or a
+// spouse hop at either endpoint. BFS finds that automatically, and always finds
+// the shortest such path, without needing to special-case which combination of
+// blood/marriage hops connects them. Returns null only if they're in genuinely
+// disconnected parts of the tree.
+export function getRelationshipPath(persons, idA, idB) {
+  if (!idA || !idB || !persons[idA] || !persons[idB]) return null;
+  if (idA === idB) return [idA];
+
+  const cameFrom = new Map([[idA, null]]);
+  const queue = [idA];
+  let head = 0;
+  while (head < queue.length) {
+    const current = queue[head];
+    head += 1;
+    if (current === idB) break;
+    const person = getPerson(persons, current);
+    if (!person) continue;
+    const neighbors = [...person.parentIds, ...person.childrenIds];
+    if (person.spouseId) neighbors.push(person.spouseId);
+    for (const next of neighbors) {
+      if (!persons[next] || cameFrom.has(next)) continue;
+      cameFrom.set(next, current);
+      queue.push(next);
+    }
+  }
+
+  if (!cameFrom.has(idB)) return null;
+  const path = [];
+  for (let current = idB; current !== null; current = cameFrom.get(current)) {
+    path.unshift(current);
+  }
+  return path;
+}
+
 // Deepest generation count reachable from a single root (1 = the root alone).
 function maxDepthFrom(persons, id, visited = new Set()) {
   if (visited.has(id)) return 0;

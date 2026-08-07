@@ -179,6 +179,65 @@
   }
 }
 
+/* Result of "Find Connection" — floats over the canvas rather than pushing
+   layout around, since it can appear alongside the header/breadcrumb at any
+   time and should read as a dismissible toast, not a permanent bar. */
+.connection-result {
+  position: fixed;
+  top: calc(72px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(90vw, 520px);
+  padding: 8px 10px 8px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  color: var(--color-text);
+  box-shadow: var(--shadow-lg);
+}
+
+.connection-result svg:first-child {
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+
+.connection-result span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connection-result button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .connection-result button:hover {
+    background: var(--color-bg);
+    color: var(--color-text);
+  }
+}
+
+@media (max-width: 640px) {
+  .connection-result {
+    max-width: 92vw;
+    font-size: 12.5px;
+  }
+}
+
 .pedigree-breadcrumb {
   display: flex;
   align-items: center;

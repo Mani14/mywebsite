@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { NODE_H, NODE_W, COUPLE_GAP, useForestLayout, usePedigreeLayout } from '../hooks/useTreeLayout';
+import { NODE_H, NODE_W, COUPLE_GAP, AVATAR_TOP, AVATAR_SIZE, useForestLayout, usePedigreeLayout } from '../hooks/useTreeLayout';
 import { getForestRoots, getLineageRootIds, isPrimaryOnLeft } from '../utils/familyUtils';
 import ConnectorLines from './ConnectorLines';
 import MiniMap from './MiniMap';
@@ -73,6 +73,45 @@ function individualX(node, targetId) {
   return node.x + (targetOnLeft ? -HALF_COUPLE_OFFSET : HALF_COUPLE_OFFSET);
 }
 
+// A connector link is drawn as an elbow — drop, then sideways, then drop again
+// (see ConnectorLines' pathFor: `M fromX fromY V midY H toX V toY`) — so a point
+// "t" of the way along it isn't a straight-line lerp between the endpoints; it has
+// to walk the same three legs in proportion to their own length, which is what
+// makes the travel car actually turn corners with the line instead of cutting
+// diagonally through whatever card happens to sit between the two nodes.
+//
+// The line's own fromY/toY terminate at the AVATAR's edges (see useTreeLayout's
+// AVATAR_TOP/AVATAR_SIZE offsets), but the camera centres each card on its whole
+// box — node.y + NODE_H/2 (see centerTree and the locate effect below). So the
+// car's vertical legs are stretched a little past the line's own start/end to
+// reach each card's true centre — but the HORIZONTAL leg stays at the line's own
+// midY, unstretched, or the car would ride to the side of the visible track
+// instead of on it during that leg.
+// `angle` is the heading in degrees for a top-down car icon that points "up" (0deg)
+// at rest — 180 driving down, 90/-90 driving right/left — so the travel car visibly
+// turns at each leg boundary instead of staying fixed in one orientation.
+function pointAlongLink({ fromX, fromY, toX, toY }, t) {
+  const midY = (fromY + toY) / 2;
+  const carFromY = fromY - (AVATAR_TOP + AVATAR_SIZE - NODE_H / 2);
+  const carToY = toY + (NODE_H / 2 - AVATAR_TOP);
+  const legDown1 = Math.abs(midY - carFromY);
+  const legAcross = Math.abs(toX - fromX);
+  const legDown2 = Math.abs(carToY - midY);
+  const total = legDown1 + legAcross + legDown2;
+  if (total === 0) return { x: fromX, y: carFromY, angle: 0 };
+  const dist = Math.max(0, Math.min(1, t)) * total;
+  if (dist <= legDown1) {
+    const f = legDown1 === 0 ? 0 : dist / legDown1;
+    return { x: fromX, y: carFromY + (midY - carFromY) * f, angle: midY >= carFromY ? 180 : 0 };
+  }
+  if (dist <= legDown1 + legAcross) {
+    const f = legAcross === 0 ? 0 : (dist - legDown1) / legAcross;
+    return { x: fromX + (toX - fromX) * f, y: midY, angle: toX >= fromX ? 90 : -90 };
+  }
+  const f = legDown2 === 0 ? 0 : (dist - legDown1 - legAcross) / legDown2;
+  return { x: toX, y: midY + (carToY - midY) * f, angle: carToY >= midY ? 180 : 0 };
+}
+
 // Renders either every family in the dataset side by side (mode="forest", not just
 // the one connected to the focus person) or one person's ancestors-above +
 // descendants-below "hourglass" (mode="pedigree"), with `rootId` as the focus.
@@ -85,7 +124,7 @@ function individualX(node, targetId) {
 // front of the claim order, stealing a shared branch away from the real family and
 // making it vanish entirely once that tiny cluster gets excluded as a satellite.
 const FamilyTree = forwardRef(function FamilyTree(
-  { persons, rootId, priorityId, collapsed, mode = 'forest', highlightedIds, locateId, locateNonce, locatedId, meId, onFocus, onSelect, onToggle, onQuickAdd, onJumpTo, onLocateNotFound },
+  { persons, rootId, priorityId, collapsed, mode = 'forest', highlightedIds, locateId, locateNonce, locatedId, meId, travelTransitionMs, isTraveling, onFocus, onSelect, onToggle, onQuickAdd, onJumpTo, onLocateNotFound },
   exportRef
 ) {
   const rootIds = useMemo(
@@ -104,24 +143,108 @@ const FamilyTree = forwardRef(function FamilyTree(
     [layout]
   );
 
-  // Every "parentId|childId" pair where both ends are on the highlighted
-  // lineage-to-root chain — handed to ConnectorLines so it can draw that
-  // specific run of connectors a second time, in the highlight colour.
-  // A couple's connector is always anchored to whichever spouse the layout used
-  // as its placement id, which isn't necessarily the one getAncestorChain walked
-  // through (parentIds[0]) — so a link also counts as highlighted when its
-  // parentId's SPOUSE is the chain member, not just an exact id match.
-  const highlightedPairs = useMemo(() => {
-    if (!highlightedIds?.size) return null;
-    const pairs = new Set();
-    layout.links.forEach(({ parentId, childId }) => {
-      if (!parentId || !childId || !highlightedIds.has(childId)) return;
-      const parentOnChain =
-        highlightedIds.has(parentId) || highlightedIds.has(persons[parentId]?.spouseId);
-      if (parentOnChain) pairs.add(`${parentId}|${childId}`);
+  // Built by walking the chain IN ORDER (not by filtering layout.links, which has
+  // no notion of sequence) so ConnectorLines can draw the highlight progressively,
+  // segment by segment, in the same order the chain itself runs — a couple's
+  // connector is anchored to whichever spouse the layout used as its placement id,
+  // so each hop also checks the chain member's spouse, not just an exact id match.
+  // A segment that ISN'T drawn in the CURRENT layout (e.g. right after a mid-travel
+  // jump, when most of the path lived in the view we just left) pushes `null`
+  // rather than being skipped — the array's length must always match chain.length-1
+  // so index i keeps meaning "chain[i] -> chain[i+1]" everywhere else that indexes
+  // into it (revealIndex in ConnectorLines, locatedChainIndex for the travel car).
+  const highlightedLinks = useMemo(() => {
+    if (!highlightedIds?.size) return [];
+    const chain = [...highlightedIds];
+    const linkByPair = new Map();
+    layout.links.forEach((l) => {
+      if (l.parentId && l.childId) linkByPair.set(`${l.parentId}|${l.childId}`, l);
     });
-    return pairs;
+    const lookup = (a, b) => linkByPair.get(`${a}|${b}`) || linkByPair.get(`${b}|${a}`);
+    const result = [];
+    for (let i = 0; i < chain.length - 1; i += 1) {
+      const a = chain[i];
+      const b = chain[i + 1];
+      const aSpouse = persons[a]?.spouseId;
+      const bSpouse = persons[b]?.spouseId;
+      const link =
+        lookup(a, b) ||
+        (aSpouse && lookup(aSpouse, b)) ||
+        (bSpouse && lookup(a, bSpouse));
+      if (!link) {
+        result.push(null);
+        continue;
+      }
+      // A link's own fromX/fromY is always its PARENT's position (drawn above),
+      // regardless of which way the chain actually walks through it — reorient so
+      // fromX/fromY match `a` (where the travel currently is) and toX/toY match
+      // `b` (where it's headed). Without this, any leg of the path that climbs
+      // UP from a child to a parent — e.g. Ilan up to his father Velmurugan —
+      // has the travel car start at the parent's end and drive backwards.
+      const aIsParentEnd = link.parentId === a || persons[link.parentId]?.spouseId === a;
+      result.push(
+        aIsParentEnd ? link : { ...link, fromX: link.toX, fromY: link.toY, toX: link.fromX, toY: link.fromY }
+      );
+    }
+    return result;
   }, [layout.links, highlightedIds, persons]);
+
+  // Where the highlight has "reached" so far — drives both the progressive line
+  // reveal and the travel car below. -1 means locatedId isn't on the highlighted
+  // chain at all (e.g. Highlight Lineage, which never calls Locate), in which case
+  // ConnectorLines falls back to revealing the whole path at once instead of
+  // segment-by-segment.
+  const highlightChainArray = useMemo(() => (highlightedIds ? [...highlightedIds] : []), [highlightedIds]);
+  const locatedChainIndex = useMemo(
+    () => (isTraveling && locatedId ? highlightChainArray.indexOf(locatedId) : -1),
+    [isTraveling, highlightChainArray, locatedId]
+  );
+
+  // The little "travel car" marker (Find Connection) — rides the ACTUAL connector
+  // geometry (a vertical drop, a horizontal run, another vertical drop) instead of
+  // gliding in a straight line between two node centres, so it visibly takes the
+  // same turns the red line does rather than cutting diagonally across cards.
+  // `currentLink` is whichever highlighted segment the travel is currently
+  // crossing; index 0 (sitting at the very first node, before the first hop has
+  // even started) has none yet, so the car rests at that link's own start point.
+  const currentLink = locatedChainIndex > 0 ? highlightedLinks[locatedChainIndex - 1] : null;
+  // Falls back to the located node's own position (not a link) whenever there's no
+  // usable segment to ride: at the very start, OR right after a mid-travel jump —
+  // the new pedigree view rarely still draws the segment leading INTO the bridge
+  // person, since that segment usually lived entirely in the view just left, so
+  // without this the car would simply vanish for the length of the jump detour.
+  const locatedNode = locatedChainIndex >= 0
+    ? layout.nodes.find((n) => n.person.id === locatedId || n.spouse?.id === locatedId)
+    : null;
+  const carFallbackPoint = locatedNode ? { x: individualX(locatedNode, locatedId), y: locatedNode.y + 60, angle: 0 } : null;
+  const carRestPoint = currentLink
+    ? null
+    : (locatedChainIndex === 0 && highlightedLinks[0]
+        ? pointAlongLink(highlightedLinks[0], 0)
+        : carFallbackPoint);
+  const showCar = locatedChainIndex >= 0 && (currentLink || carRestPoint);
+
+  const carRef = useRef(null);
+  const carAnimRef = useRef(null);
+  useEffect(() => {
+    cancelAnimationFrame(carAnimRef.current);
+    if (!currentLink || !carRef.current) return undefined;
+    const duration = travelTransitionMs ?? 220;
+    const start = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      // Ease in/out rather than constant speed — matches the camera pan's own
+      // cubic-bezier easing so the car doesn't feel like it's on a different clock.
+      const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+      const pt = pointAlongLink(currentLink, eased);
+      if (carRef.current) {
+        carRef.current.style.transform = `translate(${pt.x - 14}px, ${pt.y - 14}px) rotate(${pt.angle}deg)`;
+      }
+      if (t < 1) carAnimRef.current = requestAnimationFrame(tick);
+    };
+    carAnimRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(carAnimRef.current);
+  }, [currentLink, travelTransitionMs]);
 
   // Dad-side/mom-side highlighting: whichever two lineage trees are the current
   // focus person's father's and mother's, tinted so their halves of the diagram
@@ -507,10 +630,23 @@ const FamilyTree = forwardRef(function FamilyTree(
             width: Math.max(layout.width, 1),
             height: Math.max(layout.height + NODE_H, 1),
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transition: isDragging || isWheeling ? 'none' : 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+            transition: isDragging || isWheeling
+              ? 'none'
+              // "Find Connection" travel: a long, slow transition (near the full gap
+              // between hops) so the camera glides continuously from node to node —
+              // a "drive" — instead of the normal quick snap-then-idle-pause centring
+              // used everywhere else (locate/search/set-root).
+              : `transform ${travelTransitionMs ?? 220}ms cubic-bezier(0.22, 1, 0.36, 1)`,
           }}
         >
-          <ConnectorLines links={layout.links} width={layout.width} height={layout.height} highlightedPairs={highlightedPairs} />
+          <ConnectorLines
+            links={layout.links}
+            width={layout.width}
+            height={layout.height}
+            highlightedLinks={highlightedLinks}
+            revealIndex={locatedChainIndex}
+            transitionMs={travelTransitionMs}
+          />
           {layout.nodes.map((node, index) => (
             <TreeNode
               key={node.id}
@@ -529,6 +665,37 @@ const FamilyTree = forwardRef(function FamilyTree(
               onJumpTo={onJumpTo}
             />
           ))}
+          {showCar && (
+            <div
+              ref={carRef}
+              className="travel-car"
+              // No CSS transition here — the RAF loop above already drives a new
+              // transform every frame while a segment is in flight, and a CSS
+              // transition layered on top of per-frame updates would keep re-easing
+              // from whatever the last frame happened to be, reading as lag/stutter
+              // instead of smooth motion. At rest (carRestPoint, no active segment)
+              // a plain static position is all that's needed.
+              style={
+                currentLink
+                  ? undefined
+                  : {
+                      transform: `translate(${carRestPoint.x - 14}px, ${carRestPoint.y - 14}px) rotate(${carRestPoint.angle}deg)`,
+                    }
+              }
+            >
+              {/* Top-down car glyph (not a side-view emoji) so rotating it to face
+                  the current leg's direction — up/down/left/right — actually reads
+                  as the car turning, instead of a sideways car spinning oddly. */}
+              <svg width="24" height="24" viewBox="0 0 24 24">
+                <rect x="7" y="2" width="10" height="20" rx="4" fill="#e63946" stroke="#7a1f27" strokeWidth="1" />
+                <rect x="9" y="4.5" width="6" height="5" rx="1.5" fill="#bfe3ff" />
+                <rect x="4.5" y="6" width="2.2" height="4" rx="1" fill="#1f1f1f" />
+                <rect x="17.3" y="6" width="2.2" height="4" rx="1" fill="#1f1f1f" />
+                <rect x="4.5" y="14" width="2.2" height="4" rx="1" fill="#1f1f1f" />
+                <rect x="17.3" y="14" width="2.2" height="4" rx="1" fill="#1f1f1f" />
+              </svg>
+            </div>
+          )}
         </div>
       </div>
 

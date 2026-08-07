@@ -29,19 +29,22 @@
   cursor: grabbing;
 }
 
-.connector-highlight {
-  animation: connector-draw-in var(--duration-slow) var(--ease);
-}
-
-@keyframes connector-draw-in {
-  from {
-    opacity: 0;
-    stroke-width: 8;
-  }
-  to {
-    opacity: 1;
-    stroke-width: 4;
-  }
+/* "Find Connection" travel marker — a top-down car glyph (see FamilyTree's
+   pointAlongLink) that rides the actual connector geometry and rotates to face
+   whichever leg it's currently driving, rather than a fixed-orientation emoji. */
+.travel-car {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 5;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
 }
 
 .tree-world {

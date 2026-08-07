@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, GitBranch, Link2, LocateFixed, LogOut, Menu, Redo2, ShieldCheck, Undo2 } from 'lucide-react';
+import { ArrowLeft, Check, GitBranch, Link2, LocateFixed, LogOut, Menu, PlayCircle, Redo2, Route, ShieldCheck, Undo2, X } from 'lucide-react';
 import { useFamily } from './hooks/useFamily';
 import { useAuth } from './hooks/useAuth';
 import Login from './components/Login';
 import AttachYourself from './components/AttachYourself';
+import FindConnectionModal from './components/FindConnectionModal';
 import BrandLogo from './components/BrandLogo';
 import FamilyTree from './components/FamilyTree';
 import SearchBar from './components/SearchBar';
@@ -16,11 +17,31 @@ import ThemeToggle from './components/ThemeToggle';
 import StatsPanel from './components/StatsPanel';
 import DataHealthPanel from './components/DataHealthPanel';
 import MobileMenu from './components/MobileMenu';
-import { getPerson, getFullName, getAncestorChain } from './utils/familyUtils';
+import {
+  getPerson,
+  getFullName,
+  getAncestorChain,
+  getRelationshipPath,
+  getRelationshipLabel,
+  getRelationshipLabelTamil,
+} from './utils/familyUtils';
 import './styles/App.css';
 
 // Maps a formState.mode to the `relation` PersonForm/getEligibleLinkCandidates use.
 const RELATION_BY_MODE = { addParent: 'parent', addSpouse: 'spouse', addChild: 'child', addSibling: 'sibling' };
+
+// "Find Connection" travel animation pacing — TRAVEL_STEP_MS is the gap between
+// hops (readable, per user feedback), TRAVEL_TRANSITION_MS is how long the camera
+// pan itself takes: deliberately shorter than the gap so each glide finishes with a
+// brief settle before the next one starts, instead of being cut off mid-motion by
+// the next hop firing before it's done.
+const TRAVEL_STEP_MS = 3200;
+const TRAVEL_TRANSITION_MS = 2800;
+// A mid-travel jump (see handleLocateNotFound) swaps the ENTIRE canvas to a new
+// pedigree view, a much bigger visual event than a normal hop — gets extra
+// breathing room on top of the usual gap so there's a proper beat looking at the
+// bridge person again before continuing on.
+const JUMP_PAUSE_MS = 4200;
 
 export default function App() {
   const {
@@ -66,6 +87,15 @@ export default function App() {
   // Root"; falls back to "me" so relationships read relative to you by default.
   const [explicitRootId, setExplicitRootId] = useState(null);
   const treeRef = useRef(null);
+  // "Find Connection" travel animation state — lives in refs, not React state,
+  // since it's driven by a chain of setTimeouts rather than renders. `index` is
+  // always the NEXT hop still to run (i.e. one past whichever hop most recently
+  // fired), so a mid-travel jump failure can look back to find the bridge person
+  // (see handleLocateNotFound). travelTimerRef holds whichever single timeout is
+  // currently pending — cancelled on replay/Clear/a jump detour so a dismissed or
+  // superseded path can't keep hopping the located ring around on its own.
+  const travelRef = useRef({ path: [], index: 0 });
+  const travelTimerRef = useRef(null);
 
   const toggleCollapse = useCallback((id) => {
     setCollapsed((prev) => {
@@ -136,9 +166,22 @@ export default function App() {
     setHighlightedChain(getAncestorChain(persons, id));
   }, [persons]);
   const handleClearHighlight = useCallback(() => {
+    clearTimeout(travelTimerRef.current);
+    travelRef.current = { path: [], index: 0 };
+    setIsTraveling(false);
     setHighlightedChain([]);
     setLocatedId(null);
+    setConnectionResult(null);
   }, []);
+
+  // "Find Connection": pick a second person, then highlight the blood/marriage
+  // path between them via the SAME highlight mechanism as "Highlight Lineage" —
+  // a connection path is just a chain of ids, exactly like an ancestor chain is,
+  // so ConnectorLines' existing highlight-drawing logic lights it up for free.
+  const [findConnectionFromId, setFindConnectionFromId] = useState(null);
+  const [connectionResult, setConnectionResult] = useState(null); // { fromId, toId } | null
+  const [isTraveling, setIsTraveling] = useState(false); // true while the travel animation's hops are still playing out
+  const handleFindConnection = useCallback((id) => setFindConnectionFromId(id), []);
 
   // Links a person as "me" and, if they're missing a photo/email, backfills those
   // from the signed-in Google account — never overwrites data that's already there.
@@ -331,13 +374,84 @@ export default function App() {
     setLocateRequest((prev) => ({ id, nonce: prev.nonce + 1 }));
   }, [revealAncestors]);
 
+  // "Find Connection" travel animation — hops the located/centred person down the
+  // path node-by-node instead of jumping straight to the end, so the camera visibly
+  // walks the chain. Reuses handleLocatePerson (reveal + centre + green ring) as the
+  // single "go to this node" primitive; advanceTravel is a self-scheduling chain
+  // (each hop only queues the next one after it actually runs) rather than a batch
+  // of pre-computed delays, so a mid-travel jump detour (see handleLocateNotFound)
+  // can push everything after it back without the schedule racing itself. isTraveling
+  // switches FamilyTree to the slow "drive" transition for the trip's duration, then
+  // reverts to its normal quick snap once the last hop settles.
+  const advanceTravel = useCallback(() => {
+    const { path, index } = travelRef.current;
+    if (index >= path.length) {
+      setIsTraveling(false);
+      return;
+    }
+    handleLocatePerson(path[index]);
+    travelRef.current = { path, index: index + 1 };
+    travelTimerRef.current = setTimeout(advanceTravel, TRAVEL_STEP_MS);
+  }, [handleLocatePerson]);
+
+  const handleTravelPath = useCallback((path) => {
+    clearTimeout(travelTimerRef.current);
+    // Always start from Full Tree View, never wherever a PREVIOUS trip's mid-way
+    // jump detour (see handleLocateNotFound) left viewMode sitting — a jump only
+    // ever switches TO Pedigree View, nothing ever switches it back, so replaying
+    // (or starting a new search) right after a trip that jumped would otherwise
+    // silently begin from that leftover, narrower pedigree canvas instead of the
+    // wide comprehensive one the first run actually started from.
+    setViewMode('forest');
+    travelRef.current = { path, index: 0 };
+    setIsTraveling(true);
+    advanceTravel();
+  }, [advanceTravel]);
+
+  const handleConnectionPicked = useCallback((toId) => {
+    const fromId = findConnectionFromId;
+    setFindConnectionFromId(null);
+    const path = getRelationshipPath(persons, fromId, toId);
+    if (!path) {
+      window.alert('No direct blood or marriage connection found between these two people.');
+      return;
+    }
+    setHighlightedChain(path);
+    setConnectionResult({ fromId, toId });
+    handleTravelPath(path);
+  }, [persons, findConnectionFromId, handleTravelPath]);
+
   // Called by FamilyTree when a locate target isn't drawn in the current view (e.g. a
-  // trimmed satellite person like Ramesh in the Full Tree). Switch to their Pedigree
-  // View, which renders everyone in their lineage, so they become visible + centred.
+  // trimmed satellite person like Ramesh in the Full Tree, or someone married-in
+  // whose own parents only show up in THEIR OWN pedigree). Normally this just jumps
+  // straight to the target's pedigree view. Mid-travel, that read as skipping past
+  // the bridge person (e.g. Sofiya) straight to their parents — so instead we first
+  // re-show the bridge person via "jump to family" (a beat on Sofiya herself, in her
+  // own lineage view) and only then, after a matching pause, retry locating the
+  // original target — which is now visible, since that view includes their parents.
   const handleLocateNotFound = useCallback((id) => {
+    const { path, index } = travelRef.current;
+    const failedIndex = index - 1;
+    const bridgeId = isTraveling && failedIndex > 0 ? path[failedIndex - 1] : null;
+    if (bridgeId) {
+      clearTimeout(travelTimerRef.current);
+      // The hop that just failed already moved locatedId/focusId onto a target
+      // that isn't drawn anywhere yet — snap them back to the bridge person first,
+      // so the car/green ring don't visibly vanish or lurch ahead of the jump's
+      // new view actually opening. JUMP_PAUSE_MS (longer than a normal hop gap)
+      // then gives that beat on the bridge person room to actually register.
+      setFocusId(bridgeId);
+      setLocatedId(bridgeId);
+      handleJumpToFamily(bridgeId);
+      travelTimerRef.current = setTimeout(() => {
+        handleLocatePerson(id);
+        travelTimerRef.current = setTimeout(advanceTravel, TRAVEL_STEP_MS);
+      }, JUMP_PAUSE_MS);
+      return;
+    }
     setViewMode('pedigree');
     setFocusId(id);
-  }, []);
+  }, [isTraveling, handleJumpToFamily, handleLocatePerson, advanceTravel]);
 
   // Import replaces the whole dataset, then re-syncs any open selection/focus.
   const handleImport = useCallback((data) => {
@@ -580,6 +694,8 @@ export default function App() {
             locateNonce={locateRequest.nonce}
             locatedId={locatedId}
             meId={meId}
+            travelTransitionMs={isTraveling ? TRAVEL_TRANSITION_MS : null}
+            isTraveling={isTraveling}
             onFocus={handleFocusPerson}
             onSelect={handleSelect}
             onToggle={toggleCollapse}
@@ -624,10 +740,49 @@ export default function App() {
               onReorderChild={reorderChild}
               onHighlightLineage={handleHighlightLineage}
               onClearHighlight={handleClearHighlight}
+              onFindConnection={handleFindConnection}
             />
           )}
         </AnimatePresence>
       </main>
+
+      {connectionResult && (() => {
+        const fromPerson = getPerson(persons, connectionResult.fromId);
+        const toPerson = getPerson(persons, connectionResult.toId);
+        if (!fromPerson || !toPerson) return null;
+        const english = getRelationshipLabel(persons, connectionResult.toId, connectionResult.fromId);
+        const tamil = getRelationshipLabelTamil(persons, connectionResult.toId, connectionResult.fromId);
+        return (
+          <div className="connection-result glass-surface">
+            <Route size={14} />
+            <span>
+              {getFullName(toPerson)} is {getFullName(fromPerson)}'s{' '}
+              {tamil ? `${tamil} · ` : ''}
+              {english || 'relative (by marriage further removed)'}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleTravelPath(highlightedChain)}
+              aria-label="Replay travel animation"
+              title="Replay"
+            >
+              <PlayCircle size={14} />
+            </button>
+            <button type="button" onClick={handleClearHighlight} aria-label="Clear connection">
+              <X size={14} />
+            </button>
+          </div>
+        );
+      })()}
+
+      {findConnectionFromId && (
+        <FindConnectionModal
+          persons={persons}
+          fromId={findConnectionFromId}
+          onPick={handleConnectionPicked}
+          onCancel={() => setFindConnectionFromId(null)}
+        />
+      )}
 
       <StatsPanel persons={persons} isOpen={showStatsPanel} onClose={() => setShowStatsPanel(false)} onSelect={handleLocatePerson} />
 

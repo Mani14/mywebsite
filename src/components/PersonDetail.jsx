@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { BadgeCheck, Baby, Briefcase, Cake, ChevronDown, ChevronUp, Crown, GitBranch, HeartHandshake, Mail, MapPin, PartyPopper, Pencil, Phone, Sparkles, Trash2, UserPlus, Users, X, XCircle } from 'lucide-react';
+import { BadgeCheck, Baby, Briefcase, Cake, ChevronDown, ChevronUp, Crown, GitBranch, HeartHandshake, Mail, MapPin, PartyPopper, Pencil, Phone, Route, Sparkles, Trash2, UserPlus, Users, X, XCircle } from 'lucide-react';
 import {
   formatDateDisplay,
   getAgeInfo,
@@ -95,6 +95,7 @@ export default function PersonDetail({
   onReorderChild,
   onHighlightLineage,
   onClearHighlight,
+  onFindConnection,
 }) {
   if (!person) return null;
 
@@ -233,6 +234,9 @@ export default function PersonDetail({
           <button type="button" onClick={onClearHighlight}><XCircle size={14} /> Clear Highlight</button>
         ) : (
           <button type="button" onClick={() => onHighlightLineage(person.id)}><Sparkles size={14} /> Highlight Lineage</button>
+        )}
+        {onFindConnection && (
+          <button type="button" onClick={() => onFindConnection(person.id)}><Route size={14} /> Find Connection</button>
         )}
         {onSetMe && (
           <button type="button" onClick={() => onSetMe(isMe ? null : person.id)}>
