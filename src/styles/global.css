@@ -160,15 +160,9 @@ body {
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   -webkit-text-size-adjust: 100%;
-  /* `manipulation` removes the ~300ms tap delay and double-tap-to-zoom, but per its
-     own spec definition it still ALLOWS native pinch-zoom — which fights the tree
-     canvas's own custom pinch-zoom for any gesture that starts slightly off-target
-     (e.g. near an edge, or on the header), zooming the WHOLE PAGE (header included)
-     natively instead. Panning the page afterwards then makes the header appear to
-     "scroll away". `pan-x pan-y` keeps the same tap-delay/double-tap-zoom removal
-     but drops native pinch-zoom entirely, forcing all zooming through the app's own
-     canvas implementation. */
-  touch-action: pan-x pan-y;
+  /* Removes the ~300ms tap delay and double-tap-to-zoom on touch devices while still
+     allowing pinch-zoom, so buttons/cards feel instantly responsive on mobile. */
+  touch-action: manipulation;
   transition: background var(--duration-base) var(--ease), color var(--duration-base) var(--ease);
 }
 

@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion';
-import { ArrowUpRight, BadgeCheck, Plus } from 'lucide-react';
+import { ArrowUpRight, BadgeCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { NODE_W, NODE_H, COUPLE_GAP, AVATAR_SIZE } from '../hooks/useTreeLayout';
 import { getDisplayName, getFullName, getInitials, isPrimaryOnLeft } from '../utils/familyUtils';
@@ -66,7 +66,7 @@ function MiniCard({ person, isFocus, isHighlighted, isLocated, isMe, hasSpouse, 
         onClick={() => (isFocus ? onSelect(person.id) : onFocus(person.id))}
         title={getDisplayName(person)}
       >
-        <motion.span className={`mini-card-avatar-wrap avatar-wrap-${person.gender}`} tabIndex={-1} {...avatarSpring}>
+        <motion.span className="mini-card-avatar-wrap" tabIndex={-1} {...avatarSpring}>
           <span className={genderClass}>
             {person.photo ? <img src={person.photo} alt="" crossOrigin="anonymous" /> : getInitials(person)}
           </span>
@@ -104,7 +104,7 @@ function MiniCard({ person, isFocus, isHighlighted, isLocated, isMe, hasSpouse, 
               setMenuOpen((open) => !open);
             }}
           >
-            <Plus size={13} strokeWidth={2.5} />
+            +
           </button>
 
           {menuOpen && (

@@ -3,28 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- maximum-scale/user-scalable close a gap the body touch-action fix
-         (global.css) doesn't fully cover: a pinch gesture that straddles the
-         canvas edge (one finger on it, one finger just outside, e.g. on the
-         header) can still trigger Safari's native page zoom. Once the page
-         itself is zoomed, iOS's own pan-around-the-zoomed-viewport behavior
-         drags position:sticky elements (the header) along with it — CSS can't
-         keep up with that once it happens, so the fix is to stop the page from
-         zooming at all. The tree canvas has its own dedicated pinch-zoom, so
-         nothing is lost. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Family Tree</title>
-    <!-- Sets the theme before any CSS/React renders — without this, the page
-         paints with the light-theme :root colors first (the stylesheet applies
-         regardless of data-theme) and only flips to dark once React mounts and
-         ThemeToggle's effect runs, a visible flash on every load. Must stay in
-         sync with ThemeToggle.jsx's own STORAGE_KEY/default. -->
-    <script>
-      (function () {
-        var theme = localStorage.getItem('family-hierarchy-theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', theme);
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>
