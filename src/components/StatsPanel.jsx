@@ -1,22 +1,63 @@
 import { useMemo, useState } from 'react';
-import { computeFamilyStats, getDaysUntilBirthday, getFullName } from '../utils/familyUtils';
+import { Heart } from 'lucide-react';
+import { computeFamilyStats, getDaysUntilBirthday, getForestRoots, getFullName } from '../utils/familyUtils';
+import { computeForestLayout, NODE_H, V_GAP } from '../hooks/useTreeLayout';
 import Modal from './Modal';
 import '../styles/StatsPanel.css';
 
-// Generation index (0 = topmost ancestor) by walking up the primary parent line.
-function generationOf(persons, id) {
-  let depth = 0;
-  let cur = persons[id];
-  const seen = new Set([id]);
-  while (cur && cur.parentIds[0] && persons[cur.parentIds[0]] && !seen.has(cur.parentIds[0])) {
-    seen.add(cur.parentIds[0]);
-    cur = persons[cur.parentIds[0]];
-    depth += 1;
-  }
-  return depth;
+// Generation index (0 = topmost row) for EVERY person, taken directly from Full
+// Tree View's OWN row positions (computeForestLayout — the exact same layout the
+// canvas renders from), not a separately-computed ancestor-distance. "Same
+// generation" means "same horizontal line in the tree" — whatever two people
+// share a row there is what this list should say too, so it can never disagree
+// with what's actually on screen. Earlier attempts computed generation as
+// distance from each branch's own recorded top ancestor, which meant simply
+// recording one MORE ancestor above an existing chain — even with no new
+// relationships to anyone else — silently pushed that whole branch's generation
+// number down, purely as an artifact of how much history happens to be written
+// down rather than any real change in who's related to whom. Reusing the
+// rendered layout sidesteps that: a person's row is fixed by their depth below
+// whichever root the canvas actually draws them under, unaffected by ancestors
+// added ABOVE that root. collapsed is passed empty (not whatever the user has
+// currently toggled in the visible tree) so every generation is fully expanded
+// here regardless of what's collapsed on screen; excludeSatellites is off so
+// nobody — including small bridged-in side-families the main view might hide —
+// is left out of the count.
+function computeGenerations(persons) {
+  const gen = new Map();
+  const layout = computeForestLayout(persons, getForestRoots(persons), new Set(), { excludeSatellites: false });
+  const rowHeight = NODE_H + V_GAP;
+  layout.nodes.forEach((node) => {
+    const row = Math.round(node.y / rowHeight);
+    gen.set(node.id, row);
+    if (node.spouse) gen.set(node.spouse.id, row);
+  });
+  // Anyone the forest layout didn't place at all (shouldn't normally happen —
+  // getForestRoots is meant to reach everyone) falls back to 0.
+  Object.keys(persons).forEach((id) => {
+    if (!gen.has(id)) gen.set(id, 0);
+  });
+  return gen;
 }
 
 const byName = (a, b) => getFullName(a).localeCompare(getFullName(b));
+
+const ROMAN_NUMERALS = [
+  [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+  [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+  [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+];
+function toRoman(n) {
+  let remaining = n;
+  let result = '';
+  for (const [value, symbol] of ROMAN_NUMERALS) {
+    while (remaining >= value) {
+      result += symbol;
+      remaining -= value;
+    }
+  }
+  return result;
+}
 
 // Detailed breakdown modal, opened from the header's stats icon. Every stat value is a
 // link that reveals the actual people behind the number; clicking a name jumps to them.
@@ -37,9 +78,10 @@ export default function StatsPanel({ persons, isOpen, onClose, onSelect }) {
         }
       }
     }
+    const generationById = computeGenerations(persons);
     const generations = new Map();
     for (const p of all) {
-      const g = generationOf(persons, p.id);
+      const g = generationById.get(p.id) ?? 0;
       if (!generations.has(g)) generations.set(g, []);
       generations.get(g).push(p);
     }
@@ -106,7 +148,7 @@ export default function StatsPanel({ persons, isOpen, onClose, onSelect }) {
               .map(([a, b]) => (
                 <span key={a.id + b.id} className="stats-panel-couple">
                   <button type="button" className="stats-panel-name" onClick={() => go(a.id)}>{getFullName(a)}</button>
-                  <span className="stats-panel-amp"> &amp; </span>
+                  <Heart size={12} className="stats-panel-heart" fill="currentColor" />
                   <button type="button" className="stats-panel-name" onClick={() => go(b.id)}>{getFullName(b)}</button>
                 </span>
               ))}
@@ -121,7 +163,7 @@ export default function StatsPanel({ persons, isOpen, onClose, onSelect }) {
           <h3>By generation</h3>
           {gens.map(([g, people]) => (
             <div key={g} className="stats-panel-gen-group">
-              <span className="stats-panel-gen-title">Generation {g + 1} <span className="stats-panel-count">{people.length}</span></span>
+              <span className="stats-panel-gen-title">Generation {toRoman(g + 1)} <span className="stats-panel-count">{people.length}</span></span>
               <NameList people={people} />
             </div>
           ))}
@@ -170,7 +212,7 @@ export default function StatsPanel({ persons, isOpen, onClose, onSelect }) {
         {lists.upcomingBirthdays.length > 0 && (
           <div className="stats-panel-section">
             <h3>Upcoming birthdays <span className="stats-panel-count">{lists.upcomingBirthdays.length} people</span></h3>
-            <ul>
+            <ul className="stats-panel-birthdays">
               {lists.upcomingBirthdays.map(({ person, days }) => (
                 <li key={person.id}>
                   <button type="button" className="stats-panel-name" onClick={() => go(person.id)}>{getFullName(person)}</button>

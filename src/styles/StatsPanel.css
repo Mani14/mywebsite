@@ -78,6 +78,16 @@
   font-size: 13px;
 }
 
+/* Kept deliberately compact — unlike the gender/generation breakdowns below,
+   which are the main reason someone opens this panel, "upcoming birthdays" is
+   a quick glance list that shouldn't push everything else down the page just
+   because there happen to be 10 of them. */
+.stats-panel-birthdays {
+  max-height: 160px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .stats-panel-section li {
   display: flex;
   justify-content: space-between;
@@ -102,7 +112,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 260px;
+  max-height: 420px;
   overflow-y: auto;
   padding: 10px;
   border-radius: var(--radius);
@@ -143,11 +153,12 @@
 .stats-panel-couple {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
 }
 
-.stats-panel-amp {
-  color: var(--color-text-muted);
-  font-size: 12.5px;
+.stats-panel-heart {
+  color: #e0577a;
+  flex-shrink: 0;
 }
 
 .stats-panel-gen-group {
@@ -165,5 +176,9 @@
 @media (max-width: 480px) {
   .stats-panel-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stats-panel-names {
+    max-height: 260px;
   }
 }

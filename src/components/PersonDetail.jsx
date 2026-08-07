@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { BadgeCheck, Baby, Briefcase, Cake, ChevronDown, ChevronUp, Crown, GitBranch, HeartHandshake, Mail, MapPin, PartyPopper, Pencil, Phone, Route, Sparkles, Trash2, UserPlus, Users, X, XCircle } from 'lucide-react';
 import {
@@ -19,20 +20,51 @@ import '../styles/PersonDetail.css';
 // `onReorder` (Children only — order is meaningless for Spouse/Parents/Siblings)
 // moves a child earlier/later among ITS OWN siblings, kept in sync across every
 // one of the child's recorded parents (see useFamily's reorderChild) — the only
-// way to capture birth order when exact DOB isn't known.
+// way to capture birth order when exact DOB isn't known. Drag-and-drop is layered
+// on top of the same one-step-at-a-time primitive: a drop just replays it enough
+// times to walk the dragged child from its old index to the new one, rather than
+// needing a separate "move to index" data operation. Native HTML5 drag doesn't
+// fire from touch, so it's a mouse-only shortcut — the arrows stay the only way
+// to reorder on a phone, which is why they're never removed.
 function RelationList({ title, people, onNavigate, onUnlink, onReorder }) {
+  const [dragIndex, setDragIndex] = useState(null);
+  const [overIndex, setOverIndex] = useState(null);
   if (people.length === 0) return null;
+
+  const handleDrop = (index) => {
+    if (dragIndex !== null && dragIndex !== index) {
+      const steps = index - dragIndex;
+      const direction = steps > 0 ? 'down' : 'up';
+      const draggedId = people[dragIndex].id;
+      for (let i = 0; i < Math.abs(steps); i += 1) onReorder(draggedId, direction);
+    }
+    setDragIndex(null);
+    setOverIndex(null);
+  };
+
   return (
     <div className="detail-relation">
       <span className="detail-relation-title">
         {title}
         {onReorder && people.length > 1 && (
-          <span className="detail-relation-hint">— use ▲▼ to reorder</span>
+          <span className="detail-relation-hint">— drag, or use ▲▼, to reorder</span>
         )}
       </span>
       <div className="detail-relation-links">
         {people.map((p, index) => (
-          <span key={p.id} className="detail-link-row">
+          <span
+            key={p.id}
+            className={[
+              'detail-link-row',
+              dragIndex === index && 'detail-link-row-dragging',
+              overIndex === index && dragIndex !== null && dragIndex !== index && 'detail-link-row-drop-target',
+            ].filter(Boolean).join(' ')}
+            draggable={!!onReorder}
+            onDragStart={onReorder ? () => setDragIndex(index) : undefined}
+            onDragOver={onReorder ? (e) => { e.preventDefault(); setOverIndex(index); } : undefined}
+            onDrop={onReorder ? (e) => { e.preventDefault(); handleDrop(index); } : undefined}
+            onDragEnd={onReorder ? () => { setDragIndex(null); setOverIndex(null); } : undefined}
+          >
             {onReorder && (
               <span className="detail-reorder">
                 <button

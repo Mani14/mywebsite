@@ -214,6 +214,20 @@
 .detail-link-row {
   display: inline-flex;
   align-items: stretch;
+  border-radius: var(--radius-pill);
+  transition: opacity var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
+}
+
+.detail-link-row[draggable='true'] {
+  cursor: grab;
+}
+
+.detail-link-row-dragging {
+  opacity: 0.4;
+}
+
+.detail-link-row-drop-target {
+  box-shadow: 0 0 0 2px var(--color-primary);
 }
 
 .detail-link {
