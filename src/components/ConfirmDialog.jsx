@@ -6,17 +6,30 @@ import '../styles/ConfirmDialog.css';
 // person, linking your account to one) — used in place of native window.confirm
 // so it can't be reflexively dismissed the way stacked OK/Cancel popups can, and
 // so a `danger` action reads as clearly destructive (red) rather than neutral.
-export default function ConfirmDialog({ isOpen, title, message, confirmLabel = 'Confirm', danger, onConfirm, onCancel }) {
+// `icon`/`cancelLabel` are overridable so this same shell also covers friendlier,
+// non-destructive prompts (e.g. the "add yourself" welcome nudge) without them
+// looking like a warning.
+export default function ConfirmDialog({
+  isOpen,
+  title,
+  message,
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
+  icon: Icon = AlertTriangle,
+  danger,
+  onConfirm,
+  onCancel,
+}) {
   return (
     <Modal isOpen={isOpen} onClose={onCancel} title={title} width={380} className="confirm-dialog">
       <div className={`confirm-dialog-icon${danger ? ' confirm-dialog-icon-danger' : ''}`}>
-        <AlertTriangle size={20} />
+        <Icon size={20} />
       </div>
       <h3 className="confirm-dialog-title">{title}</h3>
       <p className="confirm-dialog-message">{message}</p>
       <div className="confirm-dialog-actions">
         <button type="button" className="confirm-dialog-cancel" onClick={onCancel}>
-          Cancel
+          {cancelLabel}
         </button>
         <button
           type="button"

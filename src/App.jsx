@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, GitBranch, Link2, LocateFixed, LogOut, Menu, PlayCircle, Redo2, Route, ShieldCheck, Undo2, X } from 'lucide-react';
+import { ArrowLeft, Check, Compass, GitBranch, Link2, LocateFixed, LogOut, Menu, PlayCircle, Redo2, Route, ShieldCheck, Sparkles, Undo2, X } from 'lucide-react';
 import { useFamily } from './hooks/useFamily';
 import { useAuth } from './hooks/useAuth';
 import Login from './components/Login';
@@ -19,6 +19,7 @@ import StatsPanel from './components/StatsPanel';
 import DataHealthPanel from './components/DataHealthPanel';
 import MobileMenu from './components/MobileMenu';
 import ConfirmDialog from './components/ConfirmDialog';
+import FeatureShowcase from './components/FeatureShowcase';
 import {
   getPerson,
   getFullName,
@@ -31,6 +32,8 @@ import './styles/App.css';
 
 // Maps a formState.mode to the `relation` PersonForm/getEligibleLinkCandidates use.
 const RELATION_BY_MODE = { addParent: 'parent', addSpouse: 'spouse', addChild: 'child', addSibling: 'sibling' };
+
+const WELCOME_DISMISSED_KEY = 'family-hierarchy-welcome-dismissed';
 
 // "Find Connection" travel animation pacing — TRAVEL_STEP_MS is the gap between
 // hops (readable, per user feedback), TRAVEL_TRANSITION_MS is how long the camera
@@ -81,7 +84,9 @@ export default function App() {
   const [locatedId, setLocatedId] = useState(null); // person shown with the green "located" ring (search / Locate Me)
   const [showStatsPanel, setShowStatsPanel] = useState(false);
   const [showDataHealth, setShowDataHealth] = useState(false);
+  const [showFeatureShowcase, setShowFeatureShowcase] = useState(false);
   const [showAttachWizard, setShowAttachWizard] = useState(false);
+  const [showWelcomePrompt, setShowWelcomePrompt] = useState(false);
   // A locate request { id, nonce }: the nonce bumps on every Locate so FamilyTree
   // re-centres even when locating the same person twice or the current root.
   const [locateRequest, setLocateRequest] = useState({ id: null, nonce: 0 });
@@ -303,12 +308,33 @@ export default function App() {
     setShowAttachWizard(false);
   }, [user]);
 
+
   // "This is me" shortcut inside the wizard: the anchor the user searched for is
   // already their own existing record, so just link it instead of creating a new person.
   const handleMarkAnchorAsMe = useCallback((anchorId) => {
     handleSetMe(anchorId);
     setShowAttachWizard(false);
   }, [handleSetMe]);
+
+  // Nudges a signed-in-but-not-yet-linked user to add themselves, rather than
+  // relying entirely on them noticing the small "Not linked yet" pill in the
+  // header on their own — this is the one step that makes every relationship
+  // label/anchor in the whole app actually mean something to THIS person, so
+  // it's worth surfacing actively rather than passively. Fires at most once per
+  // browser session (sessionStorage, same pattern as BirthdayWidget's dismiss) —
+  // "Not now" shouldn't come back and nag again until the next visit.
+  const welcomeShownRef = useRef(false);
+  useEffect(() => {
+    if (welcomeShownRef.current || loading || !authReady || !user || meId) return;
+    if (sessionStorage.getItem(WELCOME_DISMISSED_KEY) === '1') return;
+    welcomeShownRef.current = true;
+    setShowWelcomePrompt(true);
+  }, [loading, authReady, user, meId]);
+
+  const dismissWelcomePrompt = useCallback(() => {
+    sessionStorage.setItem(WELCOME_DISMISSED_KEY, '1');
+    setShowWelcomePrompt(false);
+  }, []);
 
   // "Link Existing" tab: attaches an already-recorded person in the requested role
   // instead of creating a duplicate, then opens their details like a normal add would.
@@ -620,6 +646,15 @@ export default function App() {
         >
           <ShieldCheck size={17} />
         </button>
+        <button
+          type="button"
+          className="icon-btn desktop-header-item"
+          onClick={() => setShowFeatureShowcase(true)}
+          aria-label="What this app can do"
+          title="Demo: what this app can do"
+        >
+          <Compass size={17} />
+        </button>
 
         {!meId ? (
           <div className="app-attach-pill glass-surface">
@@ -645,6 +680,7 @@ export default function App() {
           onToggleViewMode={() => setViewMode((m) => (m === 'forest' ? 'pedigree' : 'forest'))}
           onOpenStats={() => setShowStatsPanel(true)}
           onOpenDataHealth={() => setShowDataHealth(true)}
+          onOpenFeatures={() => setShowFeatureShowcase(true)}
           onSignOut={signOut}
           userEmail={user.email}
           userPicture={user.picture}
@@ -862,7 +898,25 @@ export default function App() {
         />
       )}
 
+      {showWelcomePrompt && (
+        <ConfirmDialog
+          isOpen
+          title="Welcome to the family tree!"
+          message="You're signed in, but not linked to yourself in the tree yet. Adding yourself takes under a minute and makes every relationship label in the app relative to you."
+          confirmLabel="Add Me Now"
+          cancelLabel="Not Now"
+          icon={Sparkles}
+          onConfirm={() => {
+            dismissWelcomePrompt();
+            setShowAttachWizard(true);
+          }}
+          onCancel={dismissWelcomePrompt}
+        />
+      )}
+
       <StatsPanel persons={persons} isOpen={showStatsPanel} onClose={() => setShowStatsPanel(false)} onSelect={handleLocatePerson} />
+
+      <FeatureShowcase isOpen={showFeatureShowcase} onClose={() => setShowFeatureShowcase(false)} />
 
       <DataHealthPanel
         persons={persons}

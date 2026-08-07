@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import Modal from './Modal';
-import { getDisplayName, getFullName } from '../utils/familyUtils';
+import { getDisplayName, getFullName, getInitials } from '../utils/familyUtils';
 import '../styles/AttachYourself.css';
 
 const MAX_RESULTS = 8;
@@ -8,19 +8,20 @@ const MAX_RESULTS = 8;
 // Relation options offered for the chosen anchor person, mirroring TreeNode's
 // QUICK_ADD_OPTIONS eligibility rules (can't add a 2nd parent or a 2nd spouse).
 const RELATION_OPTIONS = [
-  { mode: 'addChild', label: 'Their Child', show: () => true },
-  { mode: 'addParent', label: 'Their Parent', show: (p) => p.parentIds.length < 2 },
-  { mode: 'addSpouse', label: 'Their Spouse', show: (p) => !p.spouseId },
-  { mode: 'addSibling', label: 'Their Sibling', show: () => true },
+  { mode: 'addChild', label: 'Child', show: () => true },
+  { mode: 'addParent', label: 'Parent', show: (p) => p.parentIds.length < 2 },
+  { mode: 'addSpouse', label: 'Spouse', show: (p) => !p.spouseId },
+  { mode: 'addSibling', label: 'Sibling', show: () => true },
 ];
 
-// Two-step guided wizard for a signed-in user who isn't in the tree yet:
-// 1) search + pick an existing relative to anchor onto, 2) choose your relation
-// to them (or, if the anchor already IS you, mark them as "me" directly).
-// Confirming a relation calls onAttach(anchorId, mode) so App.jsx can open the
-// normal add-relative form (prefilled with the Google profile's name/photo) and
-// auto-link the result as "me" once saved.
+// Guided wizard for a signed-in user who isn't linked to a person yet.
+// 'search' (default): search for your OWN name first — if it's already there,
+// tap it and you're done, no separate yes/no question needed up front.
+// 'searchRelative' (+ anchor once picked): the "my name isn't listed" path —
+// search for a parent/sibling already in the tree to attach near, then pick
+// how you're related to them.
 export default function AttachYourself({ persons, onAttach, onMarkAsMe, onCancel }) {
+  const [stage, setStage] = useState('search');
   const [query, setQuery] = useState('');
   const [anchorId, setAnchorId] = useState(null);
 
@@ -35,54 +36,107 @@ export default function AttachYourself({ persons, onAttach, onMarkAsMe, onCancel
   const anchor = anchorId ? persons[anchorId] : null;
   const options = anchor ? RELATION_OPTIONS.filter((opt) => opt.show(anchor)) : [];
 
-  return (
-    <Modal isOpen onClose={onCancel} title="Add Yourself to the Tree" width={420} className="attach-yourself-modal">
-      {!anchor ? (
-        <div className="attach-step">
-          <p className="attach-step-hint">Search for a relative already in the tree to attach yourself near.</p>
-          <input
-            type="text"
-            autoFocus
-            placeholder="Search by name…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="attach-search-input"
-          />
-          {matches.length > 0 && (
-            <ul className="attach-search-results">
-              {matches.map((person) => (
-                <li key={person.id}>
-                  <button type="button" onClick={() => setAnchorId(person.id)}>
-                    {getDisplayName(person)}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {query.trim() && matches.length === 0 && <p className="attach-step-empty">No matches found.</p>}
-        </div>
-      ) : (
-        <div className="attach-step">
-          <p className="attach-step-hint">
-            How are you related to <strong>{getFullName(anchor)}</strong>?
-          </p>
-          {onMarkAsMe && (
-            <button type="button" className="attach-this-is-me-btn" onClick={() => onMarkAsMe(anchor.id)}>
-              ✓ This is me — I'm already in the tree
-            </button>
-          )}
-          <div className="attach-relation-options">
+  const goToStage = (next) => {
+    setStage(next);
+    setQuery('');
+    setAnchorId(null);
+  };
+
+  let step;
+  if (stage === 'search') {
+    step = (
+      <div className="attach-step">
+        <p className="attach-step-hint">Search for your own name — if you're already listed, tap it below.</p>
+        <input
+          type="text"
+          autoFocus
+          placeholder="Search by name…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="attach-search-input"
+        />
+        {matches.length > 0 && (
+          <ul className="attach-search-results">
+            {matches.map((person) => (
+              <li key={person.id}>
+                <button type="button" onClick={() => onMarkAsMe(person.id)}>
+                  {getDisplayName(person)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {query.trim() && matches.length === 0 && <p className="attach-step-empty">No matches found.</p>}
+        <button type="button" className="attach-back-btn" onClick={() => goToStage('searchRelative')}>
+          My name isn't listed →
+        </button>
+      </div>
+    );
+  } else if (stage === 'searchRelative' && !anchor) {
+    step = (
+      <div className="attach-step">
+        <p className="attach-step-hint">Search for your parent's or sibling's name.</p>
+        <input
+          type="text"
+          autoFocus
+          placeholder="Search by name…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="attach-search-input"
+        />
+        {matches.length > 0 && (
+          <ul className="attach-search-results">
+            {matches.map((person) => (
+              <li key={person.id}>
+                <button type="button" onClick={() => setAnchorId(person.id)}>
+                  {getDisplayName(person)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {query.trim() && matches.length === 0 && <p className="attach-step-empty">No matches found.</p>}
+        <button type="button" className="attach-back-btn" onClick={() => goToStage('search')}>
+          ← Back
+        </button>
+      </div>
+    );
+  } else {
+    // The actual person's avatar + name, with the SAME "+" badge and dropdown
+    // look TreeNode's own quick-add popover uses on the canvas — pre-expanded
+    // here rather than requiring a tap, since that popover only hides its
+    // options to cut clutter on a crowded canvas, which doesn't apply in a
+    // spacious modal with just one card in it. The point is familiarity: this
+    // should look like the exact action they'll use again later in the tree
+    // itself, not a one-off wizard-only control.
+    step = (
+      <div className="attach-step">
+        <div className="attach-anchor-preview">
+          <span className="attach-anchor-avatar-wrap">
+            <span className={`avatar avatar-${anchor.gender}`}>
+              {anchor.photo ? <img src={anchor.photo} alt="" /> : getInitials(anchor)}
+            </span>
+            <span className="attach-anchor-add-badge" aria-hidden="true">+</span>
+          </span>
+          <span className="attach-anchor-name">{getFullName(anchor)}</span>
+          <div className="attach-relation-menu">
             {options.map((opt) => (
               <button key={opt.mode} type="button" onClick={() => onAttach(anchor.id, opt.mode)}>
                 {opt.label}
               </button>
             ))}
           </div>
-          <button type="button" className="attach-back-btn" onClick={() => setAnchorId(null)}>
-            ← Choose a different relative
-          </button>
         </div>
-      )}
+        <button type="button" className="attach-back-btn" onClick={() => setAnchorId(null)}>
+          ← Choose a different relative
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <Modal isOpen onClose={onCancel} title="Add Yourself to the Tree" width={420} className="attach-yourself-modal">
+      {step}
     </Modal>
   );
 }

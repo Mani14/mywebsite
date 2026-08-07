@@ -118,6 +118,30 @@
   display: inline-flex;
 }
 
+/* Gender-color gradient ring, bleeding outward from behind the avatar via a
+   negative inset — a pure paint effect (the wrap's own box stays exactly
+   60px), so none of the geometry that's calibrated against a bare 60px
+   circle — the "+" badge's `top: 54px`, the jump badge's `top: 4px; left:
+   76px`, or useTreeLayout.js's connector-line math (AVATAR_SIZE/AVATAR_TOP) —
+   needs to change. */
+.mini-card-avatar-wrap::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  z-index: -1;
+}
+
+.avatar-wrap-male::before {
+  background: linear-gradient(135deg, #8bc1cc, var(--color-male));
+}
+.avatar-wrap-female::before {
+  background: linear-gradient(135deg, #f2b2d3, var(--color-female));
+}
+.avatar-wrap-other::before {
+  background: linear-gradient(135deg, #aab3bf, var(--color-other));
+}
+
 .mini-card-me-badge {
   position: absolute;
   bottom: 2px;
@@ -165,7 +189,6 @@
 }
 
 .avatar {
-  --halo-rgb: var(--color-primary-rgb);
   width: 60px;
   height: 60px;
   flex-shrink: 0;
@@ -177,19 +200,20 @@
   font-weight: 700;
   font-size: 16px;
   letter-spacing: 0.3px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   overflow: hidden;
-  border: 3px solid;
+  /* Surface-colored border = the visible "gap" between the gradient ring
+     (behind, peeking out via the wrap's ::before) and the avatar's own
+     colored content. */
+  border: 3px solid var(--color-surface);
   transition: box-shadow var(--duration-base) var(--ease), transform var(--duration-base) var(--ease);
-  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.35), inset 0 -3px 5px rgba(0, 0, 0, 0.22), var(--shadow-sm),
-    0 0 14px 2px rgba(var(--halo-rgb), 0.18);
+  box-shadow: var(--shadow-md);
 }
 
 .avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.25);
   transition: transform var(--duration-base) var(--ease);
 }
 
@@ -203,25 +227,16 @@
   }
 }
 
+/* Solid gender fill for the photo/initials content — the gradient ring lives
+   one layer out on .mini-card-avatar-wrap::before instead (see above). */
 .avatar-male {
-  --halo-rgb: var(--color-male-rgb);
-  /* Pre-computed color-mix(in srgb, var(--color-male) 55%, white 45%) — written as a
-     static hex so html2canvas (used for Export Image/PDF) can parse it. Its color
-     parser doesn't understand the `color(srgb ...)` form that browsers resolve
-     color-mix() to via getComputedStyle, which made every export throw and silently
-     fail (most noticeable on mobile, where there's no console to reveal the error). */
-  background: linear-gradient(145deg, #8bc1cc, var(--color-male));
-  border-color: var(--color-male-ring, #2c8ea3);
+  background: var(--color-male);
 }
 .avatar-female {
-  --halo-rgb: var(--color-female-rgb);
-  background: linear-gradient(145deg, #f2b2d3, var(--color-female));
-  border-color: var(--color-female-ring, #a83370);
+  background: var(--color-female);
 }
 .avatar-other {
-  --halo-rgb: var(--color-other-rgb);
-  background: linear-gradient(145deg, #aab3bf, var(--color-other));
-  border-color: var(--color-other);
+  background: var(--color-other);
 }
 
 .mini-name {
@@ -323,16 +338,17 @@
 }
 
 .mini-card-add {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 22px;
   height: 22px;
   border-radius: 50%;
   border: 1px solid var(--color-border);
-  background: linear-gradient(145deg, var(--color-surface), var(--color-surface-primary-tint));
+  /* Solid tint (already pre-computed static hex per theme, export-safe) rather
+     than a gradient — the gradient identity now lives on the avatar's own ring. */
+  background: var(--color-surface-primary-tint);
   color: var(--color-primary);
-  font-size: 15px;
-  line-height: 1;
-  font-weight: 700;
   cursor: pointer;
   box-shadow: var(--shadow-md);
   opacity: 0;
@@ -381,7 +397,7 @@
   padding: 0;
   border-radius: 50%;
   border: 2px solid var(--color-surface);
-  background: linear-gradient(145deg, var(--color-primary-white-tint), var(--color-primary));
+  background: linear-gradient(135deg, var(--color-primary-white-tint), var(--color-primary));
   color: #fff;
   cursor: pointer;
   box-shadow: var(--shadow-md);

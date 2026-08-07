@@ -6,7 +6,10 @@ import '../styles/ThemeToggle.css';
 const STORAGE_KEY = 'family-hierarchy-theme';
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState(() => localStorage.getItem(STORAGE_KEY) || 'light');
+  // Dark is the default for anyone with no stored preference yet (first visit,
+  // or localStorage cleared) — doesn't affect anyone who's already chosen either
+  // theme, since that choice is what's actually read here.
+  const [theme, setTheme] = useState(() => localStorage.getItem(STORAGE_KEY) || 'dark');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
