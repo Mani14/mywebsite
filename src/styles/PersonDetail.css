@@ -211,23 +211,46 @@
   gap: 6px;
 }
 
+/* Framer's Reorder computes drag position along a single axis (see
+   ReorderableRow) — a wrapping row of pills doesn't have one, so the
+   reorderable (Children) list stacks vertically instead of wrapping, unlike
+   the plain (non-reorderable) relation lists above. */
+.detail-relation-links-reorderable {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
 .detail-link-row {
   display: inline-flex;
   align-items: stretch;
+  position: relative;
   border-radius: var(--radius-pill);
+  background: var(--color-surface);
   transition: opacity var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
 }
 
-.detail-link-row[draggable='true'] {
+/* The grip is the only part of the row that starts a drag (see ReorderableRow) —
+   sized/bordered as the leftmost segment of the same pill-shaped cluster the
+   reorder arrows continue, so the whole thing reads as one control. */
+.detail-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  border: 1px solid var(--color-border);
+  border-right: none;
+  border-radius: 999px 0 0 999px;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
   cursor: grab;
+  /* Without this, a touch drag starting on the handle also tries to scroll
+     the page underneath it, fighting the reorder gesture. */
+  touch-action: none;
 }
 
-.detail-link-row-dragging {
-  opacity: 0.4;
-}
-
-.detail-link-row-drop-target {
-  box-shadow: 0 0 0 2px var(--color-primary);
+.detail-drag-handle:active {
+  cursor: grabbing;
 }
 
 .detail-link {
@@ -269,13 +292,15 @@
 }
 
 /* Move a child earlier/later among their siblings — the two arrows stack into the
-   same height as the name pill so the row reads as one continuous control. */
+   same height as the name pill so the row reads as one continuous control. Sits
+   between the drag handle and the name pill, so it's a flat middle segment
+   rather than owning either rounded end itself. */
 .detail-reorder {
   display: flex;
   flex-direction: column;
   border: 1px solid var(--color-border);
+  border-left: none;
   border-right: none;
-  border-radius: 999px 0 0 999px;
   overflow: hidden;
 }
 

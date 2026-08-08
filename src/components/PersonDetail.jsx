@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { BadgeCheck, Baby, Briefcase, Cake, ChevronDown, ChevronUp, Crown, GitBranch, HeartHandshake, Mail, MapPin, PartyPopper, Pencil, Phone, Route, Sparkles, Trash2, UserPlus, Users, X, XCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { motion, Reorder, useDragControls } from 'framer-motion';
+import { BadgeCheck, Baby, Briefcase, Cake, ChevronDown, ChevronUp, Crown, GitBranch, GripVertical, HeartHandshake, Mail, MapPin, PartyPopper, Pencil, Phone, Route, Sparkles, Trash2, UserPlus, Users, X, XCircle } from 'lucide-react';
 import {
   formatDateDisplay,
   getAgeInfo,
@@ -17,31 +17,98 @@ import {
 } from '../utils/familyUtils';
 import '../styles/PersonDetail.css';
 
+// One draggable row — a dedicated grip handle starts the drag (via Framer's
+// dragControls) rather than the whole row, so a plain tap on the name still
+// navigates and normal list scrolling isn't hijacked by an accidental touch
+// anywhere else on the row. Framer's Reorder drag runs on pointer events, so
+// unlike the old native-HTML5-drag implementation this works from touch too.
+function ReorderableRow({ person, index, count, onNavigate, onUnlink, onReorder, onDragEnd }) {
+  const controls = useDragControls();
+  return (
+    <Reorder.Item
+      value={person.id}
+      as="span"
+      dragListener={false}
+      dragControls={controls}
+      onDragEnd={onDragEnd}
+      className="detail-link-row"
+      whileDrag={{ scale: 1.04, boxShadow: '0 4px 14px rgba(0,0,0,.25)', zIndex: 1 }}
+    >
+      <span
+        className="detail-drag-handle"
+        title="Drag to reorder"
+        onPointerDown={(e) => controls.start(e)}
+      >
+        <GripVertical size={13} />
+      </span>
+      <span className="detail-reorder">
+        <button
+          type="button"
+          className="detail-reorder-btn"
+          disabled={index === 0}
+          title={`Move ${getFullName(person)} earlier`}
+          onClick={() => onReorder(person.id, 'up')}
+        >
+          <ChevronUp size={12} />
+        </button>
+        <button
+          type="button"
+          className="detail-reorder-btn"
+          disabled={index === count - 1}
+          title={`Move ${getFullName(person)} later`}
+          onClick={() => onReorder(person.id, 'down')}
+        >
+          <ChevronDown size={12} />
+        </button>
+      </span>
+      <button type="button" className="detail-link" onClick={() => onNavigate(person.id)}>
+        {getFullName(person)}
+      </button>
+      {onUnlink && (
+        <button
+          type="button"
+          className="detail-unlink"
+          title={`Remove ${getFullName(person)}`}
+          onClick={() => onUnlink(person.id)}
+        >
+          ×
+        </button>
+      )}
+    </Reorder.Item>
+  );
+}
+
 // `onReorder` (Children only — order is meaningless for Spouse/Parents/Siblings)
 // moves a child earlier/later among ITS OWN siblings, kept in sync across every
 // one of the child's recorded parents (see useFamily's reorderChild) — the only
-// way to capture birth order when exact DOB isn't known. Drag-and-drop is layered
-// on top of the same one-step-at-a-time primitive: a drop just replays it enough
-// times to walk the dragged child from its old index to the new one, rather than
-// needing a separate "move to index" data operation. Native HTML5 drag doesn't
-// fire from touch, so it's a mouse-only shortcut — the arrows stay the only way
-// to reorder on a phone, which is why they're never removed.
+// way to capture birth order when exact DOB isn't known.
 function RelationList({ title, people, onNavigate, onUnlink, onReorder }) {
-  const [dragIndex, setDragIndex] = useState(null);
-  const [overIndex, setOverIndex] = useState(null);
+  // Local visual order, live-updated by Reorder.Group as items cross each
+  // other mid-drag — kept separate from `people` (the actual Firestore-backed
+  // data) so a whole drag still becomes exactly ONE reorderChild call/undo-
+  // history entry on drop, not one per slot crossed (see reorderChild's own
+  // comment for why that matters). Re-synced from `people` whenever a drag
+  // ISN'T in progress, so edits made elsewhere (or the just-committed reorder
+  // itself) don't leave this stale.
+  const [orderIds, setOrderIds] = useState(() => people.map((p) => p.id));
+  const draggingRef = useRef(false);
+  useEffect(() => {
+    if (!draggingRef.current) setOrderIds(people.map((p) => p.id));
+  }, [people]);
+
   if (people.length === 0) return null;
 
-  const handleDrop = (index) => {
-    if (dragIndex !== null && dragIndex !== index) {
-      const steps = index - dragIndex;
-      const direction = steps > 0 ? 'down' : 'up';
-      const draggedId = people[dragIndex].id;
-      // One call for the whole drag, not one per slot moved — see reorderChild's
-      // own comment for why (each call is its own undo-history entry).
-      onReorder(draggedId, direction, Math.abs(steps));
+  const byId = new Map(people.map((p) => [p.id, p]));
+  const orderedPeople = orderIds.map((id) => byId.get(id)).filter(Boolean);
+
+  const commitReorder = (draggedId) => {
+    draggingRef.current = false;
+    const oldIndex = people.findIndex((p) => p.id === draggedId);
+    const newIndex = orderIds.indexOf(draggedId);
+    if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+      const steps = newIndex - oldIndex;
+      onReorder(draggedId, steps > 0 ? 'down' : 'up', Math.abs(steps));
     }
-    setDragIndex(null);
-    setOverIndex(null);
   };
 
   return (
@@ -52,59 +119,48 @@ function RelationList({ title, people, onNavigate, onUnlink, onReorder }) {
           <span className="detail-relation-hint">— drag, or use ▲▼, to reorder</span>
         )}
       </span>
-      <div className="detail-relation-links">
-        {people.map((p, index) => (
-          <span
-            key={p.id}
-            className={[
-              'detail-link-row',
-              dragIndex === index && 'detail-link-row-dragging',
-              overIndex === index && dragIndex !== null && dragIndex !== index && 'detail-link-row-drop-target',
-            ].filter(Boolean).join(' ')}
-            draggable={!!onReorder}
-            onDragStart={onReorder ? () => setDragIndex(index) : undefined}
-            onDragOver={onReorder ? (e) => { e.preventDefault(); setOverIndex(index); } : undefined}
-            onDrop={onReorder ? (e) => { e.preventDefault(); handleDrop(index); } : undefined}
-            onDragEnd={onReorder ? () => { setDragIndex(null); setOverIndex(null); } : undefined}
-          >
-            {onReorder && (
-              <span className="detail-reorder">
-                <button
-                  type="button"
-                  className="detail-reorder-btn"
-                  disabled={index === 0}
-                  title={`Move ${getFullName(p)} earlier`}
-                  onClick={() => onReorder(p.id, 'up')}
-                >
-                  <ChevronUp size={12} />
-                </button>
-                <button
-                  type="button"
-                  className="detail-reorder-btn"
-                  disabled={index === people.length - 1}
-                  title={`Move ${getFullName(p)} later`}
-                  onClick={() => onReorder(p.id, 'down')}
-                >
-                  <ChevronDown size={12} />
-                </button>
-              </span>
-            )}
-            <button type="button" className="detail-link" onClick={() => onNavigate(p.id)}>
-              {getFullName(p)}
-            </button>
-            {onUnlink && (
-              <button
-                type="button"
-                className="detail-unlink"
-                title={`Remove ${getFullName(p)}`}
-                onClick={() => onUnlink(p.id)}
-              >
-                ×
+      {onReorder ? (
+        <Reorder.Group
+          as="div"
+          axis="y"
+          className="detail-relation-links detail-relation-links-reorderable"
+          values={orderIds}
+          onReorder={(ids) => { draggingRef.current = true; setOrderIds(ids); }}
+        >
+          {orderedPeople.map((p, index) => (
+            <ReorderableRow
+              key={p.id}
+              person={p}
+              index={index}
+              count={orderedPeople.length}
+              onNavigate={onNavigate}
+              onUnlink={onUnlink}
+              onReorder={onReorder}
+              onDragEnd={() => commitReorder(p.id)}
+            />
+          ))}
+        </Reorder.Group>
+      ) : (
+        <div className="detail-relation-links">
+          {people.map((p) => (
+            <span key={p.id} className="detail-link-row">
+              <button type="button" className="detail-link" onClick={() => onNavigate(p.id)}>
+                {getFullName(p)}
               </button>
-            )}
-          </span>
-        ))}
-      </div>
+              {onUnlink && (
+                <button
+                  type="button"
+                  className="detail-unlink"
+                  title={`Remove ${getFullName(p)}`}
+                  onClick={() => onUnlink(p.id)}
+                >
+                  ×
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -267,7 +323,9 @@ export default function PersonDetail({
           <button type="button" onClick={() => onViewTree(person.id)}><GitBranch size={14} /> View Tree</button>
         )}
         {!isRoot && (
-          <button type="button" onClick={onSetRoot}><Crown size={14} /> Set as Root</button>
+          <button type="button" onClick={onSetRoot} title="Makes this person the default starting view for everyone">
+            <Crown size={14} /> Set as Root
+          </button>
         )}
         {isHighlighted ? (
           <button type="button" onClick={onClearHighlight}><XCircle size={14} /> Clear Highlight</button>
