@@ -1221,7 +1221,7 @@ export function computeFamilyStats(persons) {
   let deceased = 0;
   let lifespanSum = 0;
   let lifespanCount = 0;
-  const locationCounts = new Map();
+  let mapped = 0;
   const lastNameCounts = new Map();
   const countedCouples = new Set();
   let marriedCouples = 0;
@@ -1245,8 +1245,7 @@ export function computeFamilyStats(persons) {
       }
     }
 
-    const location = p.location?.trim();
-    if (location) locationCounts.set(location, (locationCounts.get(location) || 0) + 1);
+    if (p.locationLat != null && p.locationLng != null) mapped += 1;
 
     const lastName = p.lastName?.trim();
     if (lastName) lastNameCounts.set(lastName, (lastNameCounts.get(lastName) || 0) + 1);
@@ -1277,7 +1276,7 @@ export function computeFamilyStats(persons) {
     avgLifespanSampleSize: lifespanCount,
     verifiedProfiles,
     generationCount,
-    topLocations: topN(locationCounts),
+    mapped,
     topLastNames: topN(lastNameCounts),
     marriedCouples,
   };

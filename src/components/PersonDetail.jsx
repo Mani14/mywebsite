@@ -251,7 +251,26 @@ export default function PersonDetail({
         {person.dob && <div className="detail-field"><Cake size={14} /> {formatDateDisplay(person.dob)}</div>}
         {!person.isAlive && person.dod && <div className="detail-field">🕊️ {formatDateDisplay(person.dod)}</div>}
         {person.work && <div className="detail-field"><Briefcase size={14} /> {person.work}</div>}
-        {person.location && <div className="detail-field"><MapPin size={14} /> {person.location}</div>}
+        {person.location && (
+          <div className="detail-field">
+            <MapPin size={14} />
+            {/* Coordinates (when geocoded — see LocationInput) point Maps at the
+                exact pin; plain-text locations saved before that existed, or
+                typed without picking a suggestion, fall back to a text search. */}
+            <a
+              className="detail-field-link"
+              href={
+                person.locationLat != null && person.locationLng != null
+                  ? `https://www.google.com/maps/search/?api=1&query=${person.locationLat},${person.locationLng}`
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(person.location)}`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {person.location}
+            </a>
+          </div>
+        )}
         {person.phone && <div className="detail-field"><Phone size={14} /> {person.phone}</div>}
         {person.email && <div className="detail-field"><Mail size={14} /> {person.email}</div>}
         {daysUntilBirthday != null && (

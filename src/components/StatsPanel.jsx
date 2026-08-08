@@ -93,7 +93,7 @@ export default function StatsPanel({ persons, isOpen, onClose, onSelect }) {
       .slice(0, 10);
     return {
       total: all,
-      alive: all.filter((p) => p.isAlive),
+      mapped: all.filter((p) => p.locationLat != null && p.locationLng != null),
       deceased: all.filter((p) => !p.isAlive),
       verified: all.filter((p) => p.verifiedEmail),
       males: all.filter((p) => p.gender === 'male'),
@@ -128,7 +128,7 @@ export default function StatsPanel({ persons, isOpen, onClose, onSelect }) {
     { key: 'total', value: stats.totalMembers, label: 'Total members' },
     { key: 'generations', value: stats.generationCount, label: 'Generations' },
     { key: 'couples', value: stats.marriedCouples, label: 'Married couples' },
-    { key: 'alive', value: stats.alive, label: 'Living' },
+    { key: 'mapped', value: stats.mapped, label: 'On the Map' },
     { key: 'deceased', value: stats.deceased, label: 'Deceased' },
     { key: 'verified', value: stats.verifiedProfiles, label: 'Verified profiles' },
   ];
@@ -170,7 +170,7 @@ export default function StatsPanel({ persons, isOpen, onClose, onSelect }) {
         </div>
       );
     }
-    const titles = { total: 'All members', alive: 'Living', deceased: 'Deceased', verified: 'Verified profiles', males: 'Male', females: 'Female', other: 'Other' };
+    const titles = { total: 'All members', mapped: 'On the Map', deceased: 'Deceased', verified: 'Verified profiles', males: 'Male', females: 'Female', other: 'Other' };
     return (
       <div className="stats-panel-names">
         <h3>{titles[openKey]}</h3>
@@ -223,16 +223,6 @@ export default function StatsPanel({ persons, isOpen, onClose, onSelect }) {
           </div>
         )}
 
-        {stats.topLocations?.length > 0 && (
-          <div className="stats-panel-section">
-            <h3>Top locations</h3>
-            <ul>
-              {stats.topLocations.map(({ name, count }) => (
-                <li key={name}>{name} <span className="stats-panel-count">{count}</span></li>
-              ))}
-            </ul>
-          </div>
-        )}
     </Modal>
   );
 }

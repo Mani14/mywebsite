@@ -170,6 +170,20 @@
   color: var(--color-primary);
 }
 
+.detail-field-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--color-border);
+  text-underline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .detail-field-link:hover {
+    color: var(--color-primary);
+    text-decoration-color: var(--color-primary);
+  }
+}
+
 .detail-notes {
   margin-bottom: 16px;
   font-size: 13px;
