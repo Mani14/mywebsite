@@ -20,6 +20,17 @@ const DEFAULT_ZOOM = 5;
 const GPS_GOOD_ACCURACY_M = 50;
 const GPS_MAX_WAIT_MS = 20000;
 
+// Once a site's location permission is already denied, calling
+// getCurrentPosition/watchPosition again won't even show the browser's native
+// prompt — there's nothing left to ask, it's already decided — so retrying
+// just looks like nothing happened. Spelling out both places that can block it
+// (the site's own permission, and the browser app's OS-level permission — two
+// separate settings on mobile) up front instead of a generic "denied" message.
+const LOCATION_BLOCKED_STEPS = [
+  'Tap the site info icon (🔒 or ⓘ) in the address bar → Permissions/Location → Allow.',
+  'On phones, the browser app itself also needs OS-level location access — check Settings → Privacy → Location Services (iOS) or Settings → Apps → [Browser] → Permissions (Android).',
+];
+
 // Reports every click's lat/lng up to the parent — has no visual output of its
 // own, it just taps into the surrounding MapContainer's events.
 function ClickCapture({ onPick }) {
@@ -40,6 +51,7 @@ export default function LocationInput({ value, lat, lng, onChange }) {
   const [showMap, setShowMap] = useState(false);
   const [accuracy, setAccuracy] = useState(null);
   const [gpsWaiting, setGpsWaiting] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const debounceRef = useRef(null);
   const theme = useTheme();
 
@@ -52,6 +64,7 @@ export default function LocationInput({ value, lat, lng, onChange }) {
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       setError('');
+      setBlocked(false);
       try {
         setResults(await searchPlaces(text.trim()));
       } catch {
@@ -85,6 +98,7 @@ export default function LocationInput({ value, lat, lng, onChange }) {
   const applyPoint = async (pickedLat, pickedLng, pickedAccuracy = null) => {
     setLoading(true);
     setError('');
+    setBlocked(false);
     setAccuracy(pickedAccuracy);
     try {
       const text = await reverseGeocode(pickedLat, pickedLng);
@@ -98,11 +112,32 @@ export default function LocationInput({ value, lat, lng, onChange }) {
     }
   };
 
-  const useCurrentLocation = () => {
+  const useCurrentLocation = async () => {
     if (!navigator.geolocation) {
+      setBlocked(false);
       setError('Geolocation is not supported by this browser.');
       return;
     }
+
+    // Checked up front, before ever calling getCurrentPosition/watchPosition —
+    // if it's already denied, calling those again wouldn't show any prompt at
+    // all (nothing left to ask), so this is the only chance to tell the person
+    // WHY nothing is happening instead of it looking broken. Not every browser
+    // implements the Permissions API for geolocation (Safari's support is
+    // patchy) — if the query itself fails, fall through to the normal flow
+    // below and let the browser's own prompt/error handle it instead.
+    try {
+      const status = await navigator.permissions?.query({ name: 'geolocation' });
+      if (status?.state === 'denied') {
+        setBlocked(true);
+        setError('Location access is blocked for this site.');
+        return;
+      }
+    } catch {
+      // Permissions API unavailable/unsupported here — proceed as normal.
+    }
+
+    setBlocked(false);
     setLoading(true);
     setGpsWaiting(true);
     setError('');
@@ -139,7 +174,8 @@ export default function LocationInput({ value, lat, lng, onChange }) {
           navigator.geolocation.clearWatch(watchId);
           setLoading(false);
           setGpsWaiting(false);
-          setError('Location access was denied — allow it in your browser settings to use this.');
+          setBlocked(true);
+          setError('Location access was denied.');
         }
       },
       { enableHighAccuracy: true, maximumAge: 0, timeout: GPS_MAX_WAIT_MS }
@@ -198,7 +234,18 @@ export default function LocationInput({ value, lat, lng, onChange }) {
       </div>
 
       {gpsWaiting && <p className="location-input-hint">Getting an accurate GPS fix… (up to {GPS_MAX_WAIT_MS / 1000}s)</p>}
-      {error && <p className="location-input-error">{error}</p>}
+      {error && (
+        <div className="location-input-error">
+          <p>{error}</p>
+          {blocked && (
+            <ol>
+              {LOCATION_BLOCKED_STEPS.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
       {!gpsWaiting && hasCoords && !error && (
         <p className="location-input-hint">
           Pinned at {lat.toFixed(4)}, {lng.toFixed(4)}
