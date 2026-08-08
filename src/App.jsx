@@ -82,7 +82,11 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [selectedId, setSelectedId] = useState(null);
   const [focusId, setFocusId] = useState(null);
-  const [viewMode, setViewMode] = useState('forest'); // 'forest' (everyone) | 'pedigree' (focus person's ancestors + descendants)
+  // 'forest' (everyone, side by side) | 'pedigree' (one person's own ancestors +
+  // descendants). Defaults to pedigree — your own lineage, centred on
+  // effectiveRootId below — since that's the personally-relevant view for
+  // whoever opens the app; the full forest is opt-in via "Full Tree View".
+  const [viewMode, setViewMode] = useState('pedigree');
   const [formState, setFormState] = useState(null); // { mode: 'edit'|'addChild'|'addSpouse', personId }
   const [highlightedChain, setHighlightedChain] = useState([]); // ordered ids from a person up to their root, or [] if none
   const [locatedId, setLocatedId] = useState(null); // person shown with the green "located" ring (search / Locate Me)
