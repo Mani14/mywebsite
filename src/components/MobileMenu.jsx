@@ -87,6 +87,9 @@ export default function MobileMenu({
               exit={{ opacity: 0, y: -6, scale: 0.96 }}
               transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
             >
+              <button type="button" role="menuitem" onClick={() => { onOpenFamilyMap(); close(); }}>
+                <Map size={15} /> Family Map
+              </button>
               <button type="button" role="menuitem" onClick={() => { onOpenStats(); close(); }}>
                 <Menu size={15} /> Full Stats
               </button>
@@ -106,9 +109,6 @@ export default function MobileMenu({
               </button>
               <button type="button" role="menuitem" onClick={() => { onOpenFeatures(); close(); }}>
                 <Compass size={15} /> Demo
-              </button>
-              <button type="button" role="menuitem" onClick={() => { onOpenFamilyMap(); close(); }}>
-                <Map size={15} /> Family Map
               </button>
               <button type="button" role="menuitem" className="mobile-menu-signout" onClick={() => { onSignOut(); close(); }}>
                 <LogOut size={15} /> Sign Out
