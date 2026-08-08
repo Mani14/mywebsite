@@ -20,16 +20,9 @@
      letting the browser try to scroll/refresh the page — without this, panning the
      tree on a phone felt laggy or triggered pull-to-refresh instead of moving the canvas. */
   touch-action: none;
-  background-image: radial-gradient(circle, var(--color-border) 1px, transparent 1px);
+  background:
+    radial-gradient(circle, var(--color-border) 1px, transparent 1px);
   background-size: 24px 24px;
-}
-
-/* Darker, more blackish-blue canvas than the rest of the dark theme's UI, with
-   a dimmer dot grid so the dots read as subtle texture instead of competing
-   with the tree's own connector lines and node borders. */
-[data-theme='dark'] .tree-canvas {
-  background-color: #05070d;
-  background-image: radial-gradient(circle, rgba(148, 163, 184, 0.18) 1px, transparent 1px);
 }
 
 .tree-canvas:active {
