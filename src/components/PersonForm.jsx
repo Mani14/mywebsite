@@ -1,9 +1,14 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Camera } from 'lucide-react';
 import { getDisplayName, getEligibleLinkCandidates } from '../utils/familyUtils';
-import LocationInput from './LocationInput';
 import Modal from './Modal';
 import '../styles/PersonForm.css';
+
+// Lazy: pulls in leaflet/react-leaflet (~150-200KB) for the "Point to Map"
+// picker, which would otherwise load on every add/edit-person open — one of
+// the most common actions in the app — even when nobody touches the location
+// field this time.
+const LocationInput = lazy(() => import('./LocationInput'));
 
 const emptyForm = {
   firstName: '',
@@ -289,13 +294,15 @@ export default function PersonForm({
           </div>
           <label>
             Location (optional)
-            <LocationInput
-              value={form.location}
-              lat={form.locationLat}
-              lng={form.locationLng}
-              approximate={form.locationApproximate}
-              onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
-            />
+            <Suspense fallback={<input type="text" disabled placeholder="Loading…" />}>
+              <LocationInput
+                value={form.location}
+                lat={form.locationLat}
+                lng={form.locationLng}
+                approximate={form.locationApproximate}
+                onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
+              />
+            </Suspense>
           </label>
         </div>
 

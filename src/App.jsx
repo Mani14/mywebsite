@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Check, Compass, GitBranch, Link2, LocateFixed, LogOut, Map, Menu, PlayCircle, Redo2, Route, ShieldCheck, Sparkles, Undo2, X } from 'lucide-react';
 import { useFamily } from './hooks/useFamily';
@@ -17,7 +17,6 @@ import ImportExport from './components/ImportExport';
 import ThemeToggle from './components/ThemeToggle';
 import StatsPanel from './components/StatsPanel';
 import DataHealthPanel from './components/DataHealthPanel';
-import FamilyMap from './components/FamilyMap';
 import MobileMenu from './components/MobileMenu';
 import ConfirmDialog from './components/ConfirmDialog';
 import FeatureShowcase from './components/FeatureShowcase';
@@ -30,6 +29,10 @@ import {
   getRelationshipLabelTamil,
 } from './utils/familyUtils';
 import './styles/App.css';
+
+// Lazy: pulls in leaflet/react-leaflet (~150-200KB), which would otherwise
+// load on every visit even for someone who never opens the map.
+const FamilyMap = lazy(() => import('./components/FamilyMap'));
 
 // Maps a formState.mode to the `relation` PersonForm/getEligibleLinkCandidates use.
 const RELATION_BY_MODE = { addParent: 'parent', addSpouse: 'spouse', addChild: 'child', addSibling: 'sibling' };
@@ -974,7 +977,12 @@ export default function App() {
 
       <StatsPanel persons={persons} isOpen={showStatsPanel} onClose={() => setShowStatsPanel(false)} onSelect={handleLocatePerson} />
 
-      <FamilyMap persons={persons} isOpen={showFamilyMap} onClose={() => setShowFamilyMap(false)} onSelect={handleLocatePerson} />
+      {/* Suspense fallback is never actually visible in practice — showFamilyMap only
+          flips true when the user clicks the header/menu button, and lazy chunks this
+          small load near-instantly on any real connection; null avoids a layout flash. */}
+      <Suspense fallback={null}>
+        <FamilyMap persons={persons} isOpen={showFamilyMap} onClose={() => setShowFamilyMap(false)} onSelect={handleLocatePerson} />
+      </Suspense>
 
       <FeatureShowcase isOpen={showFeatureShowcase} onClose={() => setShowFeatureShowcase(false)} />
 
