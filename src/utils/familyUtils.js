@@ -782,11 +782,17 @@ function tamilConnectingChild(persons, ancestorId, descendantId, totalDist) {
 // so this works whether `personId`/`bloodRelativeId` are the same person (a
 // direct blood uncle/aunt) or personId is married to bloodRelativeId (an in-law
 // uncle/aunt by marriage).
-function tamilUncleAuntPairTerm(persons, referenceId, ancestorId, bloodRelativeId, personGender) {
+// `refDistance` is how many generations below `ancestorId` referenceId sits
+// (2 for a direct uncle/aunt, where ancestorId is referenceId's grandparent) —
+// pass 3 to reuse this one generation further removed (a grand-uncle/aunt's
+// child, "if older/younger than Father" — see tamilRemovedUncleAuntPairTerm),
+// where the elder/younger check needs to land on referenceId's GRANDPARENT
+// instead of their parent.
+function tamilUncleAuntPairTerm(persons, referenceId, ancestorId, bloodRelativeId, personGender, refDistance = 2) {
   const bloodRelative = getPerson(persons, bloodRelativeId);
   if (!bloodRelative) return null;
   const side = tamilSideFromRoot(persons, referenceId, ancestorId);
-  const connectingParent = tamilConnectingChild(persons, ancestorId, referenceId, 2);
+  const connectingParent = tamilConnectingChild(persons, ancestorId, referenceId, refDistance);
   const order = connectingParent ? tamilBirthOrder(persons, ancestorId, bloodRelativeId, connectingParent) : null;
   const bloodGender = bloodRelative.gender;
 
@@ -800,11 +806,29 @@ function tamilUncleAuntPairTerm(persons, referenceId, ancestorId, bloodRelativeI
   }
   if (sameSide) {
     if (order === 'elder') return personGender === 'male' ? 'பெரியப்பா' : personGender === 'female' ? 'பெரியம்மா' : 'பெரியப்பா/பெரியம்மா';
-    if (order === 'younger') return personGender === 'male' ? 'சித்தப்பா' : personGender === 'female' ? 'சித்தி' : 'சித்தப்பா/சித்தி';
+    if (order === 'younger') return personGender === 'male' ? 'சித்தப்பா/குஞ்சப்பா' : personGender === 'female' ? 'சித்தி/சின்னம்மா' : 'சித்தப்பா/சித்தி';
     return personGender === 'male' ? 'பெரியப்பா/சித்தப்பா' : personGender === 'female' ? 'பெரியம்மா/சித்தி' : null;
   }
   // Side couldn't be determined at all (e.g. root has no recorded parents).
   return personGender === 'male' ? 'பெரியப்பா/சித்தப்பா/மாமா' : personGender === 'female' ? 'பெரியம்மா/சித்தி/அத்தை' : null;
+}
+
+// Grand-uncle/aunt's child (English "1st cousin once removed") — Tamil treats
+// them with the SAME Periyappa/Chithappa/Periyamma/Chithi/Mama/Athai words as a
+// direct uncle/aunt, one generation further removed: `personId`'s PARENT (the
+// grand-uncle/aunt) plays the role `tamilUncleAuntPairTerm` normally uses the
+// direct uncle/aunt themselves for — their side/gender decides which pair
+// applies, personId's OWN gender picks which half of it. The elder/younger
+// split compares that grand-uncle/aunt against root's own GRANDPARENT (their
+// actual recorded sibling, sharing `ancestorId` as a parent) rather than
+// against root's parent directly, since that's the nearest pair the data can
+// actually compare — colloquially this is described as "older/younger than
+// your father", since the grandparent and grand-uncle/aunt's birth order tracks
+// the same distinction a family would actually use to address them.
+function tamilRemovedUncleAuntPairTerm(persons, rootId, ancestorId, personId, personGender) {
+  const connectingSibling = tamilConnectingChild(persons, ancestorId, personId, 2);
+  if (!connectingSibling) return null;
+  return tamilUncleAuntPairTerm(persons, rootId, ancestorId, connectingSibling, personGender, 3);
 }
 
 function tamilBloodLabelFromDistances(persons, personId, rootId, distPerson, distRoot, male, female, ancestorId) {
@@ -826,7 +850,7 @@ function tamilBloodLabelFromDistances(persons, personId, rootId, distPerson, dis
   if (distRoot === distPerson) {
     if (distRoot === 1) {
       const order = tamilBirthOrder(persons, ancestorId, personId, rootId);
-      if (male) return order === 'elder' ? 'அண்ணா' : order === 'younger' ? 'தம்பி' : 'சகோதரன்';
+      if (male) return order === 'elder' ? 'அண்ணன்' : order === 'younger' ? 'தம்பி' : 'சகோதரன்';
       if (female) return order === 'elder' ? 'அக்கா' : order === 'younger' ? 'தங்கை' : 'சகோதரி';
       return 'உடன்பிறப்பு';
     }
@@ -846,7 +870,7 @@ function tamilBloodLabelFromDistances(persons, personId, rootId, distPerson, dis
           return male ? 'மைத்துனன்/மச்சான்' : female ? 'மைத்துனி/மச்சினிச்சி' : 'மச்சான்/மச்சினிச்சி';
         }
         const order = tamilBirthOrder(persons, ancestorId, personParent, rootParent);
-        if (male) return order === 'elder' ? 'அண்ணா' : order === 'younger' ? 'தம்பி' : 'சகோதரன்';
+        if (male) return order === 'elder' ? 'அண்ணன்' : order === 'younger' ? 'தம்பி' : 'சகோதரன்';
         if (female) return order === 'elder' ? 'அக்கா' : order === 'younger' ? 'தங்கை' : 'சகோதரி';
       }
     }
@@ -879,6 +903,12 @@ function tamilBloodLabelFromDistances(persons, personId, rootId, distPerson, dis
   if (distPerson === 1 && distRoot === 2) {
     return tamilUncleAuntPairTerm(persons, rootId, ancestorId, personId, male ? 'male' : female ? 'female' : null);
   }
+  // Grand-uncle/aunt's child (1st cousin once removed) — same Periyappa/
+  // Chithappa/Periyamma/Chithi/Mama/Athai pattern as a direct uncle/aunt.
+  if (distPerson === 2 && distRoot === 3) {
+    const term = tamilRemovedUncleAuntPairTerm(persons, rootId, ancestorId, personId, male ? 'male' : female ? 'female' : null);
+    if (term) return term;
+  }
   if (distPerson === 1) {
     return male ? 'பாட்டனாரின்/பாட்டியின் சகோதரர்' : female ? 'பாட்டனாரின்/பாட்டியின் சகோதரி' : 'பாட்டன்/பாட்டி வழி உறவினர்';
   }
@@ -889,24 +919,24 @@ function tamilBloodLabelFromDistances(persons, personId, rootId, distPerson, dis
 // (son/daughter-in-law) and further down. Unaffected by the uncle/aunt pair
 // rework above (root IS the blood ancestor here, no side/cross logic applies).
 function tamilInLawTermMarriedIn(distSP, distRoot, male, female) {
-  if (distSP === 1) return male ? 'மாப்பிள்ளை' : female ? 'மருமகள்' : 'மாப்பிள்ளை/மருமகள்';
+  if (distSP === 1) return male ? 'மருமகன்/மாப்பிள்ளை' : female ? 'மருமகள்/மணமகள்' : 'மாப்பிள்ளை/மருமகள்';
   if (distSP === 2) return male ? 'பேரன் மாப்பிள்ளை' : female ? 'பேத்தி மருமகள்' : 'பேரன்/பேத்தி வழி மணமகன்/மகள்';
   return male ? 'தொலைவு மாப்பிள்ளை' : female ? 'தொலைவு மருமகள்' : 'தொலைவு மணமகன்/மகள்';
 }
 
 // root's own sibling married `person` — Anni (elder brother's wife) or
-// Aththaan/Machaan (elder sister's husband) specifically; a YOUNGER sibling's
-// spouse doesn't have a standard word I could confirm, so that (and an unknown
-// birth order) falls back to a plain descriptive phrase instead of guessing.
+// Marumagal (younger brother's wife); Atthaan (elder sister's husband) or
+// Maapillai (younger sister's husband). Falls back to a plain descriptive
+// phrase only when birth order can't be determined at all.
 function tamilSiblingSpouseTerm(persons, ancestorId, rootId, siblingId, personGender) {
   const sibling = getPerson(persons, siblingId);
   if (!sibling) return null;
   const order = tamilBirthOrder(persons, ancestorId, siblingId, rootId);
   if (sibling.gender === 'male' && personGender === 'female') {
-    return order === 'elder' ? 'அண்ணி' : order === 'younger' ? 'தம்பியின் மனைவி' : 'சகோதரனின் மனைவி';
+    return order === 'elder' ? 'அண்ணி' : order === 'younger' ? 'மருமகள்' : 'சகோதரனின் மனைவி';
   }
   if (sibling.gender === 'female' && personGender === 'male') {
-    return order === 'elder' ? 'அத்தான்/மாச்சான்' : order === 'younger' ? 'தங்கையின் கணவர்' : 'சகோதரியின் கணவர்';
+    return order === 'elder' ? 'அத்தான்' : order === 'younger' ? 'மாப்பிள்ளை' : 'சகோதரியின் கணவர்';
   }
   return null;
 }
@@ -986,11 +1016,11 @@ function tamilInLawLabel(persons, personId, rootId, male, female) {
         const order = tamilBirthOrder(persons, ancestorId, personId, root.spouseId);
         if (root.gender === 'male') {
           // root is the husband; person is his wife's sibling.
-          if (personGender === 'male') term = order === 'younger' ? 'மைத்துனர்/கொழுந்தன்' : 'மனைவியின் சகோதரர்';
-          if (personGender === 'female') term = order === 'younger' ? 'மச்சினி' : 'மனைவியின் சகோதரி';
+          if (personGender === 'male') term = order === 'younger' ? 'மச்சான்' : order === 'elder' ? 'மச்சினன்' : 'மனைவியின் சகோதரர்';
+          if (personGender === 'female') term = order === 'younger' ? 'கொழுந்தி' : order === 'elder' ? 'அண்ணி' : 'மனைவியின் சகோதரி';
         } else if (root.gender === 'female') {
           // root is the wife; person is her husband's sibling.
-          if (personGender === 'male') term = order === 'younger' ? 'கொழுந்தனார்' : 'கணவரின் சகோதரர்';
+          if (personGender === 'male') term = order === 'younger' ? 'கொழுந்தன்' : order === 'elder' ? 'மாமா' : 'கணவரின் சகோதரர்';
           if (personGender === 'female') term = 'நாத்தனார்';
         }
       } else if (distPersonToAnc === 1 && distRS === 2) {
