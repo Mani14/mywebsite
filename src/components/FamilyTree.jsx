@@ -117,7 +117,8 @@ function pointAlongLink({ fromX, fromY, toX, toY }, t) {
 // descendants-below "hourglass" (mode="pedigree"), with `rootId` as the focus.
 // `priorityId` anchors which lineage wins ownership of a shared descendant (e.g.
 // Kesavamoorthy/Vanaja) — it defaults to `rootId` but should normally be given the
-// PERSISTED root person (App.jsx's rootPersonId), not the transient focus. Ownership
+// PERSISTED root person (App.jsx's effectiveRootId — your own personal default,
+// not the shared family data), not the transient focus. Ownership
 // needs to stay stable as you click around the tree; keying it to whoever you're
 // currently looking at would let ownership flip mid-session — e.g. clicking someone
 // whose lineage traces to a tiny satellite cluster would shove that cluster to the

@@ -78,7 +78,7 @@ export default function App() {
     canUndo,
     canRedo,
   } = useFamily();
-  const { user, authReady, signIn, signOut, meId, meReady, setMe } = useAuth();
+  const { user, authReady, signIn, signOut, meId, meReady, myRootId, setMe, setMyRoot } = useAuth();
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [selectedId, setSelectedId] = useState(null);
   const [focusId, setFocusId] = useState(null);
@@ -98,6 +98,13 @@ export default function App() {
   // Person the relationship badge is measured against — set only by explicit "Set as
   // Root"; falls back to "me" so relationships read relative to you by default.
   const [explicitRootId, setExplicitRootId] = useState(null);
+  // Which person's tree view you land on — a PERSONAL preference (myRootId,
+  // stored on your own account, see useAuth), never the shared family data —
+  // so one person setting theirs doesn't change what anyone else sees. Falls
+  // back to viewing yourself if you haven't chosen one, then to the shared
+  // family doc's rootPersonId only as a last resort for a brand-new/unlinked
+  // visitor. Skips any reference to someone who's since been deleted.
+  const effectiveRootId = [myRootId, meId, rootPersonId].find((id) => id && persons[id]) || null;
   const treeRef = useRef(null);
   // "Find Connection" travel animation state — lives in refs, not React state,
   // since it's driven by a chain of setTimeouts rather than renders. `index` is
@@ -159,21 +166,23 @@ export default function App() {
     setFocusId(id);
   }, []);
 
-  // Persists the selected person as the tree's default root (survives page refresh)
-  // and immediately switches to Pedigree View for them — centred in the middle,
-  // father's side to the left, mother's side to the right, generic to whoever is
-  // set as root (not specific to any one person).
+  // Persists the selected person as YOUR OWN default root (survives page
+  // refresh/devices, via your own account — see useAuth's setMyRoot) and
+  // immediately switches to Pedigree View for them — centred in the middle,
+  // father's side to the left, mother's side to the right. Personal to you:
+  // it doesn't touch the shared family data, so it never changes what anyone
+  // else in the family sees.
   const handleSetAsRoot = useCallback(() => {
     if (!selectedId) return;
-    setRoot(selectedId);
+    setMyRoot(selectedId);
     setExplicitRootId(selectedId);
-    // rootId={focusId || rootPersonId} below always prefers focusId when set —
-    // without this, a focus left over from before switching roots keeps the
+    // rootId={focusId || effectiveRootId} below always prefers focusId when set
+    // — without this, a focus left over from before switching roots keeps the
     // diagram (and its yellow ring) centred on whoever was focused earlier
     // instead of following the new root.
     setFocusId(selectedId);
     setViewMode('pedigree');
-  }, [selectedId, setRoot]);
+  }, [selectedId, setMyRoot]);
 
   const closeDetail = useCallback(() => setSelectedId(null), []);
   const closeForm = useCallback(() => setFormState(null), []);
@@ -548,8 +557,8 @@ export default function App() {
   }, [replaceAll]);
 
   const selected = getPerson(persons, selectedId);
-  const isAlreadyRoot = selectedId === rootPersonId;
-  const focusedPerson = getPerson(persons, focusId || rootPersonId);
+  const isAlreadyRoot = selectedId === effectiveRootId;
+  const focusedPerson = getPerson(persons, focusId || effectiveRootId);
 
   // Naming convention: a child's surname is the FATHER's (male parent's) first name.
   const childSurnameFor = (parentId) => {
@@ -792,22 +801,27 @@ export default function App() {
       </header>
 
       {/* Persistent full-width strip, same visual language as BirthdayWidget/
-          AnniversaryWidget below — shown whenever someone else is set as root,
-          regardless of view mode (Full Tree included). Only goes away via
-          Clear, not by leaving Lineage View. Tracks rootPersonId specifically
-          (not focusId) — clicking around within Lineage View or jumping to a
-          married-in person's family shouldn't change who this says the root
-          is; only an explicit "Set as Root" should. */}
-      {meId && rootPersonId && rootPersonId !== meId && (
+          AnniversaryWidget below — shown whenever your OWN personal root
+          (effectiveRootId, see above — never the shared family data) differs
+          from you, regardless of view mode (Full Tree included). Only goes
+          away via Clear, not by leaving Lineage View. Tracks effectiveRootId
+          specifically (not focusId) — clicking around within Lineage View or
+          jumping to a married-in person's family shouldn't change who this
+          says the root is; only an explicit "Set as Root" should. */}
+      {meId && effectiveRootId && effectiveRootId !== meId && (
         <div className="viewing-as-strip">
           <span className="viewing-as-strip-label">
-            Viewing as <strong>{getFullName(getPerson(persons, rootPersonId))}</strong>
+            Viewing as <strong>{getFullName(getPerson(persons, effectiveRootId))}</strong>
           </span>
           <button
             type="button"
             className="viewing-as-strip-clear"
             onClick={() => {
-              setRoot(meId);
+              // Clears back to no personal override — effectiveRootId then
+              // naturally falls through to meId (viewing yourself), rather
+              // than hard-coding that here, so it keeps falling back
+              // correctly if you're ever unlinked later too.
+              setMyRoot(null);
               setFocusId(meId);
               // "Set as Root" also stamps explicitRootId (see relationshipAnchorId
               // below), which otherwise keeps relationship labels ("1st Cousin to
@@ -848,8 +862,8 @@ export default function App() {
           <FamilyTree
             ref={treeRef}
             persons={persons}
-            rootId={focusId || rootPersonId}
-            priorityId={rootPersonId}
+            rootId={focusId || effectiveRootId}
+            priorityId={effectiveRootId}
             collapsed={collapsed}
             mode={viewMode}
             highlightedIds={highlightedIds}
