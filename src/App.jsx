@@ -846,14 +846,26 @@ export default function App() {
         </div>
       )}
 
-      {viewMode === 'pedigree' && (
+      {/* Only shown once you've actually navigated away from yourself (via
+          focusId, or because your own "Set as Root" preference points at
+          someone else) — pointless (and confusing) to offer "back to your
+          tree" when that's already what's on screen. Requires meId since
+          "your tree" isn't a well-defined target until you've linked
+          yourself. */}
+      {viewMode === 'pedigree' && meId && (focusId || effectiveRootId) !== meId && (
         <div className="pedigree-breadcrumb">
+          {/* Returns to YOUR OWN lineage (still in Lineage View — the full
+              forest is now a separate, deliberate opt-in via the header's
+              "Full Tree View" toggle, not this button's job). Reuses
+              handleLocatePerson so it also gets the same green located-ring +
+              camera-centre flourish "Locate Me" already uses, rather than a
+              plain, silent focus change. */}
           <button
             type="button"
             className="pedigree-breadcrumb-back"
-            onClick={() => setViewMode('forest')}
+            onClick={() => handleLocatePerson(meId)}
           >
-            <ArrowLeft size={14} /> Back to Full Tree
+            <ArrowLeft size={14} /> Back to your tree
           </button>
         </div>
       )}
