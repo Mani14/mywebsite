@@ -682,15 +682,21 @@ export default function App() {
         ) : (
           <div className="app-attach-pill glass-surface">
             <LocateFixed size={14} />
-            {/* Always visible regardless of view mode or which family/lineage
-                you've navigated to (see relationshipAnchorId above) — so it's
-                never ambiguous whose POV relationship labels are shown from. */}
-            <span className="app-viewing-as">
-              Viewing as <strong>{getFullName(getPerson(persons, meId))}</strong>
-            </span>
             <button type="button" onClick={() => handleLocatePerson(meId)}>
               Locate Me
             </button>
+          </div>
+        )}
+
+        {/* Only shown once you've navigated to someone ELSE's family — showing
+            "Viewing as: [your own name]" all the time was redundant/obvious.
+            Persistent across Full Tree <-> Lineage View (unlike the pedigree-
+            only breadcrumb below), since focusedPerson/rootPersonId don't
+            reset when you switch back to Full Tree — it stays visible until
+            you actually navigate elsewhere. */}
+        {focusedPerson && focusedPerson.id !== meId && (
+          <div className="app-viewing-as glass-surface">
+            Viewing as: <strong>{getFullName(focusedPerson)}</strong>
           </div>
         )}
 
@@ -784,6 +790,9 @@ export default function App() {
       </header>
 
       {viewMode === 'pedigree' && (
+        // "Viewing as: X" (above, in the header) already covers whose family
+        // this is and persists across Full Tree <-> Lineage View — this bar is
+        // just the way back, no need to duplicate that label here too.
         <div className="pedigree-breadcrumb">
           <button
             type="button"
@@ -792,16 +801,6 @@ export default function App() {
           >
             <ArrowLeft size={14} /> Back to Full Tree
           </button>
-          {focusedPerson && (
-            /* Deliberately NOT worded "Viewing as" — that phrase is reserved for
-               the header's meId-based relationship-perspective pill. This is
-               just which family you've navigated to; the two are independent
-               (see relationshipAnchorId above) and using the same wording for
-               both was confusing when they point at different people. */
-            <span className="pedigree-breadcrumb-label">
-              Browsing: <strong>{getFullName(focusedPerson)}'s Family</strong>
-            </span>
-          )}
         </div>
       )}
 

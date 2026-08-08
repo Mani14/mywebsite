@@ -179,11 +179,24 @@
   cursor: pointer;
 }
 
+/* Only rendered when browsing someone other than yourself (see App.jsx) — no
+   truncation, the whole point is the full name being visible, not clipped. */
 .app-viewing-as {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.82rem;
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 220px;
+}
+
+.app-viewing-as strong {
+  color: var(--color-focus);
+  font-weight: 700;
 }
 
 @media (hover: hover) {
@@ -283,10 +296,6 @@
     border-color: var(--color-primary);
     transform: translateX(-2px);
   }
-}
-
-.pedigree-breadcrumb-label {
-  color: var(--color-text-muted);
 }
 
 .app-main {
@@ -402,19 +411,7 @@
     padding: var(--space-2) var(--space-3);
   }
 
-  .pedigree-breadcrumb-label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* "Viewing as" (.app-viewing-as) is deliberately excluded — hiding it here
-     would defeat the point of it being a prominent, always-visible indicator. */
   .app-attach-pill-label {
     display: none;
-  }
-
-  .app-viewing-as {
-    max-width: 110px;
   }
 }
