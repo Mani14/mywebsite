@@ -9,11 +9,21 @@ export function useAuth() {
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [meId, setMeId] = useState(null);
+  // Distinguishes "meId hasn't loaded from Firestore yet" from "genuinely no
+  // link exists" — meId is null in both cases, so callers that need to tell
+  // a real never-linked user apart from an in-flight fetch (see App's
+  // welcome-nudge effect) should gate on this too, not just !meId.
+  const [meReady, setMeReady] = useState(false);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
       setUser(u ? { uid: u.uid, email: u.email, name: u.displayName, picture: u.photoURL } : null);
-      if (!u) setMeId(null);
+      if (!u) {
+        setMeId(null);
+        setMeReady(true); // signed out — nothing left to fetch
+      } else {
+        setMeReady(false); // about to fetch this account's own link
+      }
       setAuthReady(true);
     });
   }, []);
@@ -23,6 +33,7 @@ export function useAuth() {
     if (!user?.uid) return undefined;
     return onSnapshot(doc(db, 'users', user.uid), (snap) => {
       setMeId(snap.exists() ? snap.data().meId ?? null : null);
+      setMeReady(true);
     });
   }, [user?.uid]);
 
@@ -42,5 +53,5 @@ export function useAuth() {
     [user?.uid]
   );
 
-  return { user, authReady, signIn, signOut, meId, setMe };
+  return { user, authReady, signIn, signOut, meId, meReady, setMe };
 }

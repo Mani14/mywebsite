@@ -101,7 +101,7 @@ export default function MobileMenu({
                 />
               </div>
               <button type="button" role="menuitem" onClick={() => { onToggleViewMode(); close(); }}>
-                <GitBranch size={15} /> {viewMode === 'forest' ? 'Pedigree View' : 'Full Tree View'}
+                <GitBranch size={15} /> {viewMode === 'forest' ? 'Lineage View' : 'Full Tree View'}
               </button>
               <button type="button" role="menuitem" onClick={() => { onOpenFeatures(); close(); }}>
                 <Compass size={15} /> Demo

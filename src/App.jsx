@@ -74,7 +74,7 @@ export default function App() {
     canUndo,
     canRedo,
   } = useFamily();
-  const { user, authReady, signIn, signOut, meId, setMe } = useAuth();
+  const { user, authReady, signIn, signOut, meId, meReady, setMe } = useAuth();
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [selectedId, setSelectedId] = useState(null);
   const [focusId, setFocusId] = useState(null);
@@ -162,6 +162,11 @@ export default function App() {
     if (!selectedId) return;
     setRoot(selectedId);
     setExplicitRootId(selectedId);
+    // rootId={focusId || rootPersonId} below always prefers focusId when set —
+    // without this, a focus left over from before switching roots keeps the
+    // diagram (and its yellow ring) centred on whoever was focused earlier
+    // instead of following the new root.
+    setFocusId(selectedId);
     setViewMode('pedigree');
   }, [selectedId, setRoot]);
 
@@ -323,13 +328,22 @@ export default function App() {
   // it's worth surfacing actively rather than passively. Fires at most once per
   // browser session (sessionStorage, same pattern as BirthdayWidget's dismiss) —
   // "Not now" shouldn't come back and nag again until the next visit.
-  const welcomeShownRef = useRef(false);
+  //
+  // Decided exactly once per session, the first moment meReady confirms the
+  // real (not still-loading) link status — never re-evaluated after that, even
+  // if meId later flips to null (e.g. briefly unlinking while switching who
+  // "Mark as Me" points at). Without the meReady gate, a cold/incognito load
+  // sees meId's placeholder `null` before the Firestore fetch resolves and
+  // wrongly concludes "never linked"; without the decide-once ref, every later
+  // unlink would look like a fresh never-linked user again.
+  const welcomeDecidedRef = useRef(false);
   useEffect(() => {
-    if (welcomeShownRef.current || loading || !authReady || !user || meId) return;
+    if (welcomeDecidedRef.current || loading || !authReady || !user || !meReady) return;
+    welcomeDecidedRef.current = true;
+    if (meId) return;
     if (sessionStorage.getItem(WELCOME_DISMISSED_KEY) === '1') return;
-    welcomeShownRef.current = true;
     setShowWelcomePrompt(true);
-  }, [loading, authReady, user, meId]);
+  }, [loading, authReady, user, meId, meReady]);
 
   const dismissWelcomePrompt = useCallback(() => {
     sessionStorage.setItem(WELCOME_DISMISSED_KEY, '1');
@@ -721,11 +735,11 @@ export default function App() {
               type="button"
               className="icon-btn"
               onClick={() => setViewMode((m) => (m === 'forest' ? 'pedigree' : 'forest'))}
-              aria-label={viewMode === 'forest' ? 'Switch to Pedigree View' : 'Switch to Full Tree View'}
+              aria-label={viewMode === 'forest' ? 'Switch to Lineage View' : 'Switch to Full Tree View'}
               title={viewMode === 'forest' ? 'Show ancestry + descendants for the focused person' : 'Show the full family forest'}
             >
               <GitBranch size={17} />
-              <span className="btn-label">{viewMode === 'forest' ? 'Pedigree View' : 'Full Tree View'}</span>
+              <span className="btn-label">{viewMode === 'forest' ? 'Lineage View' : 'Full Tree View'}</span>
             </button>
           </div>
 

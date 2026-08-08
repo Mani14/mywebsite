@@ -28,7 +28,7 @@ const SECTIONS = [
   {
     title: 'Explore the tree',
     items: [
-      { icon: GitBranch, title: 'Full Tree & Pedigree View', text: "See every family side by side, or one person's whole father-side and mother-side lineage." },
+      { icon: GitBranch, title: 'Full Tree & Lineage View', text: "See every family side by side, or one person's whole father-side and mother-side lineage." },
       { icon: Map, title: 'Pan, zoom & MiniMap', text: 'Pinch/drag/wheel to navigate, with a MiniMap overview for jumping around a large tree.' },
       { icon: Search, title: 'Search', text: 'Jump straight to anyone by name.' },
     ],
@@ -54,7 +54,7 @@ const SECTIONS = [
     items: [
       { icon: BadgeCheck, title: 'Add Me', text: 'Link your account to yourself — or add yourself as a brand-new person — in a guided wizard.' },
       { icon: LocateFixed, title: 'Locate Me', text: 'Centre the view on yourself at any time.' },
-      { icon: Crown, title: 'Set as Root', text: 'Re-centre relationship labels and Pedigree View around anyone.' },
+      { icon: Crown, title: 'Set as Root', text: 'Re-centre relationship labels and Lineage View around anyone.' },
     ],
   },
   {
