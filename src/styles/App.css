@@ -179,6 +179,13 @@
   cursor: pointer;
 }
 
+.app-viewing-as {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
 @media (hover: hover) {
   .app-attach-pill button:hover {
     filter: brightness(1.08);
@@ -401,7 +408,13 @@
     white-space: nowrap;
   }
 
-  .app-attach-pill span {
+  /* "Viewing as" (.app-viewing-as) is deliberately excluded — hiding it here
+     would defeat the point of it being a prominent, always-visible indicator. */
+  .app-attach-pill-label {
     display: none;
+  }
+
+  .app-viewing-as {
+    max-width: 110px;
   }
 }

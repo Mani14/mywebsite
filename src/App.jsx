@@ -90,9 +90,6 @@ export default function App() {
   // A locate request { id, nonce }: the nonce bumps on every Locate so FamilyTree
   // re-centres even when locating the same person twice or the current root.
   const [locateRequest, setLocateRequest] = useState({ id: null, nonce: 0 });
-  // Person the relationship badge is measured against — set only by explicit "Set as
-  // Root"; falls back to "me" so relationships read relative to you by default.
-  const [explicitRootId, setExplicitRootId] = useState(null);
   const treeRef = useRef(null);
   // "Find Connection" travel animation state — lives in refs, not React state,
   // since it's driven by a chain of setTimeouts rather than renders. `index` is
@@ -155,13 +152,16 @@ export default function App() {
   }, []);
 
   // Persists the selected person as the tree's default root (survives page refresh)
-  // and immediately switches to Pedigree View for them — centred in the middle,
+  // and immediately switches to Lineage View for them — centred in the middle,
   // father's side to the left, mother's side to the right, generic to whoever is
-  // set as root (not specific to any one person).
+  // set as root (not specific to any one person). Deliberately does NOT touch
+  // relationshipAnchorId below — navigating someone else's Lineage View doesn't
+  // change whose POV relationship labels ("Father", "Cousin", etc.) are shown
+  // from, which stays pinned to you (meId) so it can't quietly drift to whoever
+  // you last browsed to.
   const handleSetAsRoot = useCallback(() => {
     if (!selectedId) return;
     setRoot(selectedId);
-    setExplicitRootId(selectedId);
     // rootId={focusId || rootPersonId} below always prefers focusId when set —
     // without this, a focus left over from before switching roots keeps the
     // diagram (and its yellow ring) centred on whoever was focused earlier
@@ -565,12 +565,13 @@ export default function App() {
     return { gender: 'male' };
   };
 
-  // The relationship badge is measured against an explicitly-set root if there is one,
-  // otherwise "me"; when neither exists there's no anchor and the badge is hidden.
-  const relationshipAnchorId = explicitRootId || meId || null;
-  const relationshipAnchorContext = relationshipAnchorId
-    ? (relationshipAnchorId === meId ? 'you' : getPerson(persons, relationshipAnchorId)?.firstName || 'root')
-    : null;
+  // Relationship labels ("Father", "Cousin", etc.) are always measured against
+  // you (meId) — independent of whichever family/lineage you're currently
+  // browsing via Set as Root or Lineage View, so a relationship label never
+  // silently changes whose POV it's from just because you navigated elsewhere.
+  // No anchor (badge hidden) until you've linked yourself.
+  const relationshipAnchorId = meId || null;
+  const relationshipAnchorContext = relationshipAnchorId ? 'you' : null;
 
   // Unlink actions remove one relationship without deleting either person. `selected`
   // is always the person currently open in the detail panel; the argument is whoever
@@ -673,7 +674,7 @@ export default function App() {
         {!meId ? (
           <div className="app-attach-pill glass-surface">
             <Link2 size={14} />
-            <span>Not linked yet</span>
+            <span className="app-attach-pill-label">Not linked yet</span>
             <button type="button" onClick={() => setShowAttachWizard(true)}>
               Add Me
             </button>
@@ -681,6 +682,12 @@ export default function App() {
         ) : (
           <div className="app-attach-pill glass-surface">
             <LocateFixed size={14} />
+            {/* Always visible regardless of view mode or which family/lineage
+                you've navigated to (see relationshipAnchorId above) — so it's
+                never ambiguous whose POV relationship labels are shown from. */}
+            <span className="app-viewing-as">
+              Viewing as <strong>{getFullName(getPerson(persons, meId))}</strong>
+            </span>
             <button type="button" onClick={() => handleLocatePerson(meId)}>
               Locate Me
             </button>
@@ -786,8 +793,13 @@ export default function App() {
             <ArrowLeft size={14} /> Back to Full Tree
           </button>
           {focusedPerson && (
+            /* Deliberately NOT worded "Viewing as" — that phrase is reserved for
+               the header's meId-based relationship-perspective pill. This is
+               just which family you've navigated to; the two are independent
+               (see relationshipAnchorId above) and using the same wording for
+               both was confusing when they point at different people. */
             <span className="pedigree-breadcrumb-label">
-              Viewing: {getFullName(focusedPerson)}'s family
+              Browsing: <strong>{getFullName(focusedPerson)}'s Family</strong>
             </span>
           )}
         </div>
