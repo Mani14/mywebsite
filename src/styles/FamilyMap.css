@@ -1,0 +1,41 @@
+.family-map-panel h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+.family-map-empty {
+  margin: 0;
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+.family-map-canvas {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.family-map-popup-name {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.family-map-popup-location {
+  font-size: 12px;
+  color: #57606a;
+}
+
+.family-map-popup-view {
+  margin-top: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: #fff;
+  cursor: pointer;
+}

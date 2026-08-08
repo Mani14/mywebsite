@@ -1097,6 +1097,8 @@ export function createEmptyPerson(id) {
     isAlive: true,
     work: '',
     location: '',
+    locationLat: null,
+    locationLng: null,
     phone: '',
     email: '',
     photo: '',

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Camera } from 'lucide-react';
 import { getDisplayName, getEligibleLinkCandidates } from '../utils/familyUtils';
+import LocationInput from './LocationInput';
 import Modal from './Modal';
 import '../styles/PersonForm.css';
 
@@ -14,6 +15,8 @@ const emptyForm = {
   isAlive: true,
   work: '',
   location: '',
+  locationLat: null,
+  locationLng: null,
   phone: '',
   email: '',
   photo: '',
@@ -273,20 +276,25 @@ export default function PersonForm({
               <input value={form.work} onChange={(e) => setField('work', e.target.value)} />
             </label>
             <label>
-              Location (optional)
-              <input value={form.location} onChange={(e) => setField('location', e.target.value)} />
-            </label>
-          </div>
-          <div className="person-form-row">
-            <label>
               Phone (optional)
               <input value={form.phone} onChange={(e) => setField('phone', e.target.value)} />
             </label>
+          </div>
+          <div className="person-form-row">
             <label>
               Email (optional)
               <input type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} />
             </label>
           </div>
+          <label>
+            Location (optional)
+            <LocationInput
+              value={form.location}
+              lat={form.locationLat}
+              lng={form.locationLng}
+              onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
+            />
+          </label>
         </div>
 
         <div className="person-form-section">

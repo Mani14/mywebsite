@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Compass, GitBranch, LogOut, Menu, ShieldCheck } from 'lucide-react';
+import { Compass, GitBranch, LogOut, Map, Menu, ShieldCheck } from 'lucide-react';
 import ImportExport from './ImportExport';
 import '../styles/MobileMenu.css';
 
@@ -18,6 +18,7 @@ export default function MobileMenu({
   onOpenStats,
   onOpenDataHealth,
   onOpenFeatures,
+  onOpenFamilyMap,
   onSignOut,
   userEmail,
   userPicture,
@@ -105,6 +106,9 @@ export default function MobileMenu({
               </button>
               <button type="button" role="menuitem" onClick={() => { onOpenFeatures(); close(); }}>
                 <Compass size={15} /> Demo
+              </button>
+              <button type="button" role="menuitem" onClick={() => { onOpenFamilyMap(); close(); }}>
+                <Map size={15} /> Family Map
               </button>
               <button type="button" role="menuitem" className="mobile-menu-signout" onClick={() => { onSignOut(); close(); }}>
                 <LogOut size={15} /> Sign Out

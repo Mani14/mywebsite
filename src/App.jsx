@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, Check, Compass, GitBranch, Link2, LocateFixed, LogOut, Menu, PlayCircle, Redo2, Route, ShieldCheck, Sparkles, Undo2, X } from 'lucide-react';
+import { ArrowLeft, Check, Compass, GitBranch, Link2, LocateFixed, LogOut, Map, Menu, PlayCircle, Redo2, Route, ShieldCheck, Sparkles, Undo2, X } from 'lucide-react';
 import { useFamily } from './hooks/useFamily';
 import { useAuth } from './hooks/useAuth';
 import Login from './components/Login';
@@ -17,6 +17,7 @@ import ImportExport from './components/ImportExport';
 import ThemeToggle from './components/ThemeToggle';
 import StatsPanel from './components/StatsPanel';
 import DataHealthPanel from './components/DataHealthPanel';
+import FamilyMap from './components/FamilyMap';
 import MobileMenu from './components/MobileMenu';
 import ConfirmDialog from './components/ConfirmDialog';
 import FeatureShowcase from './components/FeatureShowcase';
@@ -85,6 +86,7 @@ export default function App() {
   const [showStatsPanel, setShowStatsPanel] = useState(false);
   const [showDataHealth, setShowDataHealth] = useState(false);
   const [showFeatureShowcase, setShowFeatureShowcase] = useState(false);
+  const [showFamilyMap, setShowFamilyMap] = useState(false);
   const [showAttachWizard, setShowAttachWizard] = useState(false);
   const [showWelcomePrompt, setShowWelcomePrompt] = useState(false);
   // A locate request { id, nonce }: the nonce bumps on every Locate so FamilyTree
@@ -669,6 +671,15 @@ export default function App() {
         >
           <Compass size={17} />
         </button>
+        <button
+          type="button"
+          className="icon-btn desktop-header-item"
+          onClick={() => setShowFamilyMap(true)}
+          aria-label="Family map"
+          title="See everyone's pinned locations on a map"
+        >
+          <Map size={17} />
+        </button>
 
         {!meId ? (
           <div className="app-attach-pill glass-surface">
@@ -695,6 +706,7 @@ export default function App() {
           onOpenStats={() => setShowStatsPanel(true)}
           onOpenDataHealth={() => setShowDataHealth(true)}
           onOpenFeatures={() => setShowFeatureShowcase(true)}
+          onOpenFamilyMap={() => setShowFamilyMap(true)}
           onSignOut={signOut}
           userEmail={user.email}
           userPicture={user.picture}
@@ -961,6 +973,8 @@ export default function App() {
       )}
 
       <StatsPanel persons={persons} isOpen={showStatsPanel} onClose={() => setShowStatsPanel(false)} onSelect={handleLocatePerson} />
+
+      <FamilyMap persons={persons} isOpen={showFamilyMap} onClose={() => setShowFamilyMap(false)} onSelect={handleLocatePerson} />
 
       <FeatureShowcase isOpen={showFeatureShowcase} onClose={() => setShowFeatureShowcase(false)} />
 
