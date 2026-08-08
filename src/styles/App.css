@@ -254,6 +254,50 @@
   font-size: 13px;
 }
 
+/* Persistent strip (not gated by view mode, unlike .pedigree-breadcrumb above)
+   — same full-width-bar language as .birthday-widget/.anniversary-widget. */
+.viewing-as-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-2) var(--space-5);
+  background: rgba(var(--color-focus-rgb), 0.14);
+  border-bottom: 1px solid rgba(var(--color-focus-rgb), 0.35);
+  color: var(--color-focus);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.viewing-as-strip-label {
+  min-width: 0;
+}
+
+.viewing-as-strip-label strong {
+  font-weight: 700;
+}
+
+.viewing-as-strip-clear {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(var(--color-focus-rgb), 0.4);
+  background: transparent;
+  color: var(--color-focus);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--duration-fast) var(--ease);
+}
+
+@media (hover: hover) {
+  .viewing-as-strip-clear:hover {
+    background: rgba(var(--color-focus-rgb), 0.16);
+  }
+}
+
 .pedigree-breadcrumb-back {
   display: flex;
   align-items: center;
@@ -276,10 +320,6 @@
     border-color: var(--color-primary);
     transform: translateX(-2px);
   }
-}
-
-.pedigree-breadcrumb-label {
-  color: var(--color-text-muted);
 }
 
 .app-main {
@@ -395,7 +435,11 @@
     padding: var(--space-2) var(--space-3);
   }
 
-  .pedigree-breadcrumb-label {
+  .viewing-as-strip {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .viewing-as-strip-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

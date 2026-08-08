@@ -776,6 +776,43 @@ export default function App() {
         </div>
       </header>
 
+      {/* Persistent full-width strip, same visual language as BirthdayWidget/
+          AnniversaryWidget below — shown whenever someone else is set as root,
+          regardless of view mode (Full Tree included). Only goes away via
+          Clear, not by leaving Lineage View. Tracks rootPersonId specifically
+          (not focusId) — clicking around within Lineage View or jumping to a
+          married-in person's family shouldn't change who this says the root
+          is; only an explicit "Set as Root" should. */}
+      {meId && rootPersonId && rootPersonId !== meId && (
+        <div className="viewing-as-strip">
+          <span className="viewing-as-strip-label">
+            Viewing as <strong>{getFullName(getPerson(persons, rootPersonId))}</strong>
+          </span>
+          <button
+            type="button"
+            className="viewing-as-strip-clear"
+            onClick={() => {
+              setRoot(meId);
+              setFocusId(meId);
+              // "Set as Root" also stamps explicitRootId (see relationshipAnchorId
+              // below), which otherwise keeps relationship labels ("1st Cousin to
+              // Velmurugan") anchored to whoever was last set as root even after
+              // the tree itself resets — clearing it falls relationshipAnchorId
+              // back to meId, same as if no one had ever been explicitly set.
+              setExplicitRootId(null);
+              // Forest View's layout doesn't key off rootId/focusId at all (see
+              // FamilyTree's own rootId-change effect), so clearing while
+              // already in Full Tree View updated the data but showed no
+              // visible change — jump into Lineage View, same as Set as Root,
+              // so it's obvious the reset actually took effect.
+              setViewMode('pedigree');
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {viewMode === 'pedigree' && (
         <div className="pedigree-breadcrumb">
           <button
@@ -785,11 +822,6 @@ export default function App() {
           >
             <ArrowLeft size={14} /> Back to Full Tree
           </button>
-          {focusedPerson && (
-            <span className="pedigree-breadcrumb-label">
-              Viewing: {getFullName(focusedPerson)}'s family
-            </span>
-          )}
         </div>
       )}
 
