@@ -68,7 +68,11 @@ function MiniCard({ person, isFocus, isHighlighted, isLocated, isMe, hasSpouse, 
       >
         <motion.span className={`mini-card-avatar-wrap avatar-wrap-${person.gender}`} tabIndex={-1} {...avatarSpring}>
           <span className={genderClass}>
-            {person.photo ? <img src={person.photo} alt="" crossOrigin="anonymous" /> : getInitials(person)}
+            {/* No crossOrigin here — person.photo is always a data: URI (see
+                PersonForm's resizePhoto), never a real cross-origin fetch, and
+                some WebKit/Safari versions fail to render a data: URI image
+                entirely when crossorigin is set on it. */}
+            {person.photo ? <img src={person.photo} alt="" /> : getInitials(person)}
           </span>
           {isMe && <BadgeCheck className="mini-card-me-badge" size={16} />}
         </motion.span>
