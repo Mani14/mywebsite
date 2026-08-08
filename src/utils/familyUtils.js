@@ -806,7 +806,7 @@ function tamilUncleAuntPairTerm(persons, referenceId, ancestorId, bloodRelativeI
   }
   if (sameSide) {
     if (order === 'elder') return personGender === 'male' ? 'பெரியப்பா' : personGender === 'female' ? 'பெரியம்மா' : 'பெரியப்பா/பெரியம்மா';
-    if (order === 'younger') return personGender === 'male' ? 'சித்தப்பா/குஞ்சப்பா' : personGender === 'female' ? 'சித்தி/சின்னம்மா' : 'சித்தப்பா/சித்தி';
+    if (order === 'younger') return personGender === 'male' ? 'சித்தப்பா' : personGender === 'female' ? 'சித்தி/சின்னம்மா' : 'சித்தப்பா/சித்தி';
     return personGender === 'male' ? 'பெரியப்பா/சித்தப்பா' : personGender === 'female' ? 'பெரியம்மா/சித்தி' : null;
   }
   // Side couldn't be determined at all (e.g. root has no recorded parents).
