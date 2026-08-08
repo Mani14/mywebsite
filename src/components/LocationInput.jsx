@@ -18,7 +18,15 @@ const DEFAULT_ZOOM = 5;
 // per Coordinates.accuracy) — or the best one seen once GPS_MAX_WAIT_MS runs out —
 // gives the hardware time to actually acquire satellites.
 const GPS_GOOD_ACCURACY_M = 50;
-const GPS_MAX_WAIT_MS = 20000;
+const GPS_MAX_WAIT_MS = 3000;
+// A fix worse than this on the very first reading almost always means the
+// browser only has approximate (network/Wi-Fi-based) location to work with —
+// real GPS, even weak, is rarely this far off. Confirmed cause in practice:
+// Android/iOS both let you grant a site "approximate" rather than "precise"
+// location, which no amount of enableHighAccuracy or waiting can upgrade —
+// worth telling the person immediately rather than making them sit through
+// the full GPS_MAX_WAIT_MS wait to find out their fix was never going to improve.
+const GPS_COARSE_ACCURACY_M = 500;
 
 // Once a site's location permission is already denied, calling
 // getCurrentPosition/watchPosition again won't even show the browser's native
@@ -52,6 +60,7 @@ export default function LocationInput({ value, lat, lng, onChange }) {
   const [accuracy, setAccuracy] = useState(null);
   const [gpsWaiting, setGpsWaiting] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [imprecise, setImprecise] = useState(false);
   const debounceRef = useRef(null);
   const theme = useTheme();
 
@@ -65,6 +74,7 @@ export default function LocationInput({ value, lat, lng, onChange }) {
       setLoading(true);
       setError('');
       setBlocked(false);
+      setImprecise(false);
       try {
         setResults(await searchPlaces(text.trim()));
       } catch {
@@ -99,6 +109,7 @@ export default function LocationInput({ value, lat, lng, onChange }) {
     setLoading(true);
     setError('');
     setBlocked(false);
+    setImprecise(false);
     setAccuracy(pickedAccuracy);
     try {
       const text = await reverseGeocode(pickedLat, pickedLng);
@@ -138,6 +149,7 @@ export default function LocationInput({ value, lat, lng, onChange }) {
     }
 
     setBlocked(false);
+    setImprecise(false);
     setLoading(true);
     setGpsWaiting(true);
     setError('');
@@ -149,8 +161,10 @@ export default function LocationInput({ value, lat, lng, onChange }) {
       if (watchId != null) navigator.geolocation.clearWatch(watchId);
       clearTimeout(timeoutId);
       setGpsWaiting(false);
-      if (best) applyPoint(best.coords.latitude, best.coords.longitude, best.coords.accuracy);
-      else {
+      if (best) {
+        setImprecise(false);
+        applyPoint(best.coords.latitude, best.coords.longitude, best.coords.accuracy);
+      } else {
         setLoading(false);
         setError('Could not get a precise fix — try again outdoors or near a window.');
       }
@@ -162,7 +176,13 @@ export default function LocationInput({ value, lat, lng, onChange }) {
         // Good enough to stop waiting — an actual GPS lock, not a fast-but-rough
         // Wi-Fi/cell fix (those typically read back several hundred metres to a
         // few kilometres of accuracy, well outside this threshold).
-        if (pos.coords.accuracy <= GPS_GOOD_ACCURACY_M) finish();
+        if (pos.coords.accuracy <= GPS_GOOD_ACCURACY_M) {
+          finish();
+          return;
+        }
+        // Surface this the moment it's clear, rather than waiting out the full
+        // GPS_MAX_WAIT_MS — still keeps watching in case a precise fix follows.
+        if (pos.coords.accuracy > GPS_COARSE_ACCURACY_M) setImprecise(true);
       },
       (err) => {
         // A denied-permission error is final and immediate — anything else (e.g.
@@ -234,6 +254,16 @@ export default function LocationInput({ value, lat, lng, onChange }) {
       </div>
 
       {gpsWaiting && <p className="location-input-hint">Getting an accurate GPS fix… (up to {GPS_MAX_WAIT_MS / 1000}s)</p>}
+      {imprecise && (
+        <div className="location-input-warning">
+          <p>This looks like an approximate location, not GPS-precise.</p>
+          <p>
+            Enable "Precise Location" for this browser — iOS: Settings → Privacy → Location Services → tap the
+            browser → turn on Precise Location. Android: tap "Precise" in the location permission prompt, or
+            Settings → Apps → [Browser] → Permissions → Location.
+          </p>
+        </div>
+      )}
       {error && (
         <div className="location-input-error">
           <p>{error}</p>
