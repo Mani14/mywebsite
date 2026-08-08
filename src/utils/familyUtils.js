@@ -1099,6 +1099,11 @@ export function createEmptyPerson(id) {
     location: '',
     locationLat: null,
     locationLng: null,
+    // Stamped true only by an approximate (non-precise) GPS fix — see
+    // LocationInput's GPS_COARSE_ACCURACY_M — so it's visible on the person's
+    // own record to whoever looks later, not just as a one-time toast to
+    // whoever happened to be entering it.
+    locationApproximate: false,
     phone: '',
     email: '',
     photo: '',

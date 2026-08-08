@@ -50,7 +50,7 @@ function ClickCapture({ onPick }) {
 // "Use My Current Location" (browser Geolocation + reverse geocode), or
 // "Point to Map" (click a spot on an embedded mini map). All three converge on
 // the same onChange({ location, locationLat, locationLng }) shape.
-export default function LocationInput({ value, lat, lng, onChange }) {
+export default function LocationInput({ value, lat, lng, approximate, onChange }) {
   const [query, setQuery] = useState(value || '');
   const [results, setResults] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -60,7 +60,10 @@ export default function LocationInput({ value, lat, lng, onChange }) {
   const [accuracy, setAccuracy] = useState(null);
   const [gpsWaiting, setGpsWaiting] = useState(false);
   const [blocked, setBlocked] = useState(false);
-  const [imprecise, setImprecise] = useState(false);
+  // Seeded from the person's own saved data (persists across reopening the
+  // form, unlike a plain one-off session warning) — see PersonDetail.jsx for
+  // where this same flag shows up permanently on their profile too.
+  const [imprecise, setImprecise] = useState(!!approximate);
   const debounceRef = useRef(null);
   const theme = useTheme();
 
@@ -90,10 +93,11 @@ export default function LocationInput({ value, lat, lng, onChange }) {
     setQuery(text);
     setIsOpen(true);
     setAccuracy(null);
+    setImprecise(false);
     // Editing the text after a coordinate was set means it may no longer
     // describe that point — drop the stale coordinates rather than leave a
     // pin at a place the text doesn't match anymore.
-    onChange({ location: text, locationLat: null, locationLng: null });
+    onChange({ location: text, locationLat: null, locationLng: null, locationApproximate: false });
     runSearch(text);
   };
 
@@ -102,22 +106,33 @@ export default function LocationInput({ value, lat, lng, onChange }) {
     setResults([]);
     setIsOpen(false);
     setAccuracy(null);
-    onChange({ location: result.display_name, locationLat: parseFloat(result.lat), locationLng: parseFloat(result.lon) });
+    setImprecise(false);
+    onChange({
+      location: result.display_name,
+      locationLat: parseFloat(result.lat),
+      locationLng: parseFloat(result.lon),
+      locationApproximate: false,
+    });
   };
 
   const applyPoint = async (pickedLat, pickedLng, pickedAccuracy = null) => {
     setLoading(true);
     setError('');
     setBlocked(false);
-    setImprecise(false);
+    // Only a GPS fix worse than the "clearly approximate, not weak GPS"
+    // threshold gets flagged — map-click (exact to where you tapped) and
+    // search results never pass an accuracy here, so they're never marked
+    // approximate. Persisted (see onChange below), not just shown once now.
+    const isApproximate = pickedAccuracy != null && pickedAccuracy > GPS_COARSE_ACCURACY_M;
+    setImprecise(isApproximate);
     setAccuracy(pickedAccuracy);
     try {
       const text = await reverseGeocode(pickedLat, pickedLng);
       setQuery(text);
-      onChange({ location: text, locationLat: pickedLat, locationLng: pickedLng });
+      onChange({ location: text, locationLat: pickedLat, locationLng: pickedLng, locationApproximate: isApproximate });
     } catch {
       setError('Got the coordinates, but could not look up an address for them.');
-      onChange({ location: query, locationLat: pickedLat, locationLng: pickedLng });
+      onChange({ location: query, locationLat: pickedLat, locationLng: pickedLng, locationApproximate: isApproximate });
     } finally {
       setLoading(false);
     }
@@ -162,7 +177,6 @@ export default function LocationInput({ value, lat, lng, onChange }) {
       clearTimeout(timeoutId);
       setGpsWaiting(false);
       if (best) {
-        setImprecise(false);
         applyPoint(best.coords.latitude, best.coords.longitude, best.coords.accuracy);
       } else {
         setLoading(false);
@@ -257,11 +271,7 @@ export default function LocationInput({ value, lat, lng, onChange }) {
       {imprecise && (
         <div className="location-input-warning">
           <p>This looks like an approximate location, not GPS-precise.</p>
-          <p>
-            Enable "Precise Location" for this browser — iOS: Settings → Privacy → Location Services → tap the
-            browser → turn on Precise Location. Android: tap "Precise" in the location permission prompt, or
-            Settings → Apps → [Browser] → Permissions → Location.
-          </p>
+          <p>Go to Settings → Chrome → Location → enable Precise Location, then try again.</p>
         </div>
       )}
       {error && (

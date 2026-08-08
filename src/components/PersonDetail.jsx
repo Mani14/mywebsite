@@ -269,6 +269,15 @@ export default function PersonDetail({
             >
               {person.location}
             </a>
+            {/* Stamped by LocationInput when the GPS fix that set this pin was
+                clearly approximate (not just weak GPS) — visible here to
+                whoever views the profile later, not just a one-time toast to
+                whoever entered it. */}
+            {person.locationApproximate && (
+              <span className="detail-field-warning" title="This location was set from an approximate (non-precise) GPS fix">
+                ~approximate
+              </span>
+            )}
           </div>
         )}
         {person.phone && <div className="detail-field"><Phone size={14} /> {person.phone}</div>}

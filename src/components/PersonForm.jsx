@@ -17,6 +17,7 @@ const emptyForm = {
   location: '',
   locationLat: null,
   locationLng: null,
+  locationApproximate: false,
   phone: '',
   email: '',
   photo: '',
@@ -292,6 +293,7 @@ export default function PersonForm({
               value={form.location}
               lat={form.locationLat}
               lng={form.locationLng}
+              approximate={form.locationApproximate}
               onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
             />
           </label>
