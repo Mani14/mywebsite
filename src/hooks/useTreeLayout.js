@@ -337,14 +337,22 @@ export function computeForestLayout(
   batches.forEach((batch) => {
     const rootNode = batch.tree.nodes.find((n) => n.id === batch.rootId);
     if (!rootNode) return;
-    const link = batch.tree.crossLinks.find((l) => l.parentId === rootNode.id);
+    // The crosslinked parent isn't always the root itself — e.g. Add Parent on
+    // a root inserts a new ancestor above them, demoting the old root (whose
+    // child was claimed elsewhere) to one of the new root's descendants. The
+    // shift still needs to happen — the demoted node still needs to line up
+    // one generation above its claimed child — just measured from wherever
+    // that crosslinked node actually landed in this batch, not from rootNode.
+    const link = batch.tree.crossLinks.find((l) => batch.tree.nodes.some((n) => n.id === l.parentId));
     if (!link) return;
+    const linkParentNode = batch.tree.nodes.find((n) => n.id === link.parentId);
+    if (!linkParentNode) return;
     const childBatch = batches.find(
       (b) => b !== batch && b.tree.nodes.some((n) => n.id === link.childId || n.spouse?.id === link.childId)
     );
     if (!childBatch) return;
     const childNode = childBatch.tree.nodes.find((n) => n.id === link.childId || n.spouse?.id === link.childId);
-    batch.yShift = childNode.y - (NODE_H + V_GAP) - rootNode.y;
+    batch.yShift = childNode.y - (NODE_H + V_GAP) - linkParentNode.y;
   });
 
   batches.forEach(({ rootId, tree, xOffset: xo, yShift = 0 }) => {
