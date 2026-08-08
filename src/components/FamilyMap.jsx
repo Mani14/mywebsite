@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getDisplayName, getFullName } from '../utils/familyUtils';
 import { useTheme } from '../hooks/useTheme';
@@ -13,6 +13,10 @@ const DEFAULT_CENTER = [20.5937, 78.9629]; // India — shown only when nobody h
 const DEFAULT_ZOOM = 4;
 const FOUND_ZOOM = 14;
 const MAX_RESULTS = 6;
+// Below this, a wide/regional view has too many names crowding and
+// overlapping each other to be readable — labels only earn their keep once
+// zoomed in enough that pins (and their names) have room to breathe.
+const MIN_ZOOM_FOR_LABELS = 10;
 
 const GENDER_COLOR_VAR = {
   male: 'var(--color-male)',
@@ -37,10 +41,19 @@ function FitBounds({ points }) {
   return null;
 }
 
+// Reports the current zoom level up to the parent (including after
+// programmatic changes like FitBounds/flyTo, not just manual scroll/pinch —
+// Leaflet fires zoomend for both) so name labels can be gated on it.
+function ZoomTracker({ onZoomChange }) {
+  useMapEvents({ zoomend: (e) => onZoomChange(e.target.getZoom()) });
+  return null;
+}
+
 export default function FamilyMap({ persons, isOpen, onClose, onSelect }) {
   const theme = useTheme();
   const [query, setQuery] = useState('');
   const [isOpenResults, setIsOpenResults] = useState(false);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const mapRef = useRef(null);
   const markerRefs = useRef({});
 
@@ -124,6 +137,7 @@ export default function FamilyMap({ persons, isOpen, onClose, onSelect }) {
             <MapContainer ref={mapRef} center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM} style={{ height: '480px', width: '100%' }}>
               <TileLayer url={TILE_URLS[theme] || TILE_URLS.light} attribution={TILE_ATTRIBUTION} />
               <FitBounds points={peopleWithCoords.map((p) => [p.locationLat, p.locationLng])} />
+              <ZoomTracker onZoomChange={setZoom} />
               {peopleWithCoords.map((p) => (
                 <Marker
                   key={p.id}
@@ -131,21 +145,43 @@ export default function FamilyMap({ persons, isOpen, onClose, onSelect }) {
                   position={[p.locationLat, p.locationLng]}
                   icon={dotIcon(GENDER_COLOR_VAR[p.gender] || GENDER_COLOR_VAR.other)}
                 >
+                  {zoom >= MIN_ZOOM_FOR_LABELS && (
+                    <Tooltip
+                      permanent
+                      interactive
+                      direction="top"
+                      offset={[0, -4]}
+                      className="family-map-marker-label"
+                      eventHandlers={{ click: () => markerRefs.current[p.id]?.openPopup() }}
+                    >
+                      {getDisplayName(p)}
+                    </Tooltip>
+                  )}
                   <Popup>
                     <span className="family-map-popup-name">{getFullName(p)}</span>
                     <br />
                     <span className="family-map-popup-location">{p.location}</span>
                     <br />
-                    <button
-                      type="button"
-                      className="family-map-popup-view"
-                      onClick={() => {
-                        onSelect(p.id);
-                        onClose();
-                      }}
-                    >
-                      View Details
-                    </button>
+                    <div className="family-map-popup-actions">
+                      <a
+                        className="family-map-popup-view"
+                        href={`https://www.google.com/maps/search/?api=1&query=${p.locationLat},${p.locationLng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Open in Maps
+                      </a>
+                      <button
+                        type="button"
+                        className="family-map-popup-view"
+                        onClick={() => {
+                          onSelect(p.id);
+                          onClose();
+                        }}
+                      >
+                        View Details
+                      </button>
+                    </div>
                   </Popup>
                 </Marker>
               ))}

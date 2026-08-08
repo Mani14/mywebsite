@@ -107,6 +107,26 @@
   border: 1px solid var(--color-border);
 }
 
+/* Overrides Leaflet's default plain-white tooltip box (see leaflet.css) to
+   match the app's theme — this is the always-visible name label under each
+   pin, not the click-to-open popup (family-map-popup-* above). */
+.family-map-marker-label {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font);
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+}
+
+.family-map-marker-label::before {
+  border-top-color: var(--color-border) !important;
+}
+
 .family-map-popup-name {
   font-weight: 700;
   font-size: 13px;
@@ -117,12 +137,27 @@
   color: #57606a;
 }
 
-.family-map-popup-view {
+.family-map-popup-actions {
+  display: flex;
+  gap: 6px;
   margin-top: 6px;
+}
+
+/* Leaflet's own CSS sets `.leaflet-container a { color: #0078A8; }`, which
+   otherwise beats a plain `.family-map-popup-view` class selector on
+   specificity alone and overrides the white text on the "Open in Maps" link
+   (the "View Details" <button> is unaffected — that rule only targets <a>). */
+a.family-map-popup-view {
+  color: #fff !important;
+}
+
+.family-map-popup-view {
+  display: inline-block;
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 600;
   font-family: var(--font);
+  text-decoration: none;
   border: none;
   border-radius: var(--radius-pill);
   background: var(--color-primary);
